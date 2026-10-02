@@ -49,6 +49,9 @@
   <link rel="stylesheet" href="chrome://browser/skin/translations/panel.css" />
   <link rel="stylesheet" href="chrome://browser/skin/places/tree-icons.css" />
   <link rel="stylesheet" href="chrome://browser/skin/places/editBookmark.css" />
+#if defined(XP_LINUX) || defined(XP_WIN)
+  <link rel="stylesheet" href="chrome://browser/content/freevpn/freevpn.css" />
+#endif
   <link
     rel="stylesheet"
     href="chrome://browser/skin/usercontext/container-editor.css"
@@ -66,6 +69,9 @@
   <link rel="localization" href="browser/browserSets.ftl"/>
   <link rel="localization" href="browser/firefoxRelay.ftl"/>
   <link rel="localization" href="browser/firefoxView.ftl"/>
+#if defined(XP_LINUX) || defined(XP_WIN)
+  <link rel="localization" href="browser/freeVpn.ftl"/>
+#endif
   <link rel="localization" href="browser/genai.ftl"/>
   <link rel="localization" href="browser/identityCredentialNotification.ftl" />
   <link rel="localization" href="browser/ipProtection.ftl"/>

@@ -1073,6 +1073,21 @@
     <vbox id="PanelUI-ipprotection-locations-content" class="panel-subview-body"/>
   </panelview>
 
+#if defined(XP_LINUX) || defined(XP_WIN)
+  <panelview id="PanelUI-freevpn"
+             class="PanelUI-subView"
+             mainview-with-header="true"
+             has-custom-header="true">
+    <hbox id="PanelUI-freevpn-header" class="panel-header">
+      <html:h1>
+        <html:span data-l10n-id="freevpn-title"></html:span>
+      </html:h1>
+    </hbox>
+    <toolbarseparator/>
+    <vbox id="PanelUI-freevpn-content" class="panel-subview-body"/>
+  </panelview>
+#endif
+
   <panelview id="ai-window-toggle-view" class="PanelUI-subView">
     <vbox class="panel-subview-body">
       <toolbarbutton id="ai-window-switch-classic"

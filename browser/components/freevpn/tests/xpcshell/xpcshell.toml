@@ -1,0 +1,11 @@
+[DEFAULT]
+head = ""
+firefox-appdir = "browser"
+run-if = [
+  "os == 'linux'",
+  "os == 'win'",
+]
+
+["test_FreeVPNChannelFilter.js"]
+
+["test_FreeVPNTorLauncher.js"]

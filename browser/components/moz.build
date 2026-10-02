@@ -94,6 +94,9 @@ elif CONFIG["MOZ_WIDGET_TOOLKIT"] == "windows":
         "installerprefs",
     ]
 
+if CONFIG["OS_ARCH"] in ("Linux", "WINNT"):
+    DIRS += ["freevpn"]
+
 XPIDL_SOURCES += [
     "nsIBrowserHandler.idl",
 ]

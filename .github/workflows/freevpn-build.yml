@@ -1,0 +1,119 @@
+name: Free VPN build (Linux + Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "claude/busy-tesla-k4f33u"
+    paths:
+      - "browser/components/freevpn/**"
+      - "browser/locales/en-US/browser/freeVpn.ftl"
+      - ".github/workflows/freevpn-build.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: freevpn-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MOZBUILD_STATE_PATH: ${{ github.workspace }}/.mozbuild
+  MACH_NO_TERMINAL_FOOTER: "1"
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      MOZCONFIG: ${{ github.workspace }}/browser/components/freevpn/build/mozconfig.linux64
+      OBJDIR: obj-freevpn-linux64
+    steps:
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 200
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Bootstrap
+        run: ./mach --no-interactive bootstrap --application-choice "Firefox for Desktop Artifact Mode"
+
+      - name: Build
+        run: ./mach build
+
+      - name: Lint Free VPN
+        run: ./mach lint -l eslint -l fluent-lint browser/components/freevpn browser/locales/en-US/browser/freeVpn.ftl
+
+      - name: xpcshell tests
+        run: ./mach xpcshell-test browser/components/freevpn/tests/xpcshell
+
+      - name: Package with bundled Tor
+        run: |
+          ./mach package
+          python3 browser/components/freevpn/tools/fetch_tor.py --platform linux-x86_64 --dest "$OBJDIR/dist/firefox"
+          tar -C "$OBJDIR/dist" -cJf firefox-freevpn-linux-x86_64.tar.xz firefox
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firefox-freevpn-linux-x86_64
+          path: firefox-freevpn-linux-x86_64.tar.xz
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: C:\mozilla-build\msys2\usr\bin\bash.exe --login -eo pipefail {0}
+    env:
+      MOZILLABUILD: C:\mozilla-build\
+      CHERE_INVOKING: "1"
+      MOZCONFIG: browser/components/freevpn/build/mozconfig.win64
+      OBJDIR: obj-freevpn-win64
+    steps:
+      - name: Configure git
+        shell: pwsh
+        run: |
+          git config --system core.longpaths true
+          git config --system core.autocrlf false
+
+      - name: Install MozillaBuild
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://ftp.mozilla.org/pub/mozilla/libraries/win32/MozillaBuildSetup-Latest.exe -OutFile $env:RUNNER_TEMP\MozillaBuildSetup.exe
+          Start-Process -FilePath $env:RUNNER_TEMP\MozillaBuildSetup.exe -ArgumentList '/S' -Wait
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 200
+
+      - name: Bootstrap
+        run: |
+          export PATH="/c/mozilla-build/python3:/c/mozilla-build/bin:$PATH"
+          ./mach --no-interactive bootstrap --application-choice "Firefox for Desktop Artifact Mode"
+
+      - name: Build
+        run: |
+          export PATH="/c/mozilla-build/python3:/c/mozilla-build/bin:$PATH"
+          ./mach build
+
+      - name: xpcshell tests
+        run: |
+          export PATH="/c/mozilla-build/python3:/c/mozilla-build/bin:$PATH"
+          ./mach xpcshell-test browser/components/freevpn/tests/xpcshell
+
+      - name: Package with bundled Tor
+        run: |
+          export PATH="/c/mozilla-build/python3:/c/mozilla-build/bin:$PATH"
+          ./mach package
+          python3 browser/components/freevpn/tools/fetch_tor.py --platform windows-x86_64 --dest "$OBJDIR/dist/firefox"
+          python3 -c "import shutil; shutil.make_archive('firefox-freevpn-windows-x86_64', 'zip', '$OBJDIR/dist', 'firefox')"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firefox-freevpn-windows-x86_64
+          path: firefox-freevpn-windows-x86_64.zip

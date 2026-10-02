@@ -1,0 +1,8 @@
+# Free VPN build for Windows x86_64. Run from a MozillaBuild shell.
+# Artifact builds reuse Mozilla's prebuilt C++/Rust binaries, so only the
+# front-end (where Free VPN lives) is built locally. Remove the
+# --enable-artifact-builds line for a full build from source.
+ac_add_options --enable-application=browser
+ac_add_options --target=x86_64-pc-windows-msvc
+ac_add_options --enable-artifact-builds
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-freevpn-win64

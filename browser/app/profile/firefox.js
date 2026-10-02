@@ -3830,6 +3830,37 @@ pref("browser.ipProtection.bandwidthWarningDismissedThreshold", "");
 // Pref to track if the "NEW" badge on the location selection button should be visible.
 pref("browser.ipProtection.locationButtonBadgeDismissed", false);
 
+// Free VPN: routes browser traffic through Tor or another free proxy.
+#if defined(XP_LINUX) || defined(XP_WIN)
+pref("browser.freevpn.enabled", true);
+#else
+pref("browser.freevpn.enabled", false);
+#endif
+// "tor" (managed Tor), "tor-system" (Tor already running) or "custom".
+pref("browser.freevpn.provider", "tor");
+// "all" tunnels every window, "private" only private windows.
+pref("browser.freevpn.mode", "all");
+// Tor exit country as an ISO 3166 code, or "" for automatic.
+pref("browser.freevpn.exitCountry", "");
+// Block traffic instead of falling back to a direct connection on failure.
+pref("browser.freevpn.killSwitch", true);
+// Reconnect on startup if the VPN was on when the browser closed.
+pref("browser.freevpn.autoConnect", false);
+pref("browser.freevpn.wasConnected", false);
+pref("browser.freevpn.widgetAdded", false);
+// Path to a tor binary; empty to search the bundled copy, common locations and PATH.
+pref("browser.freevpn.tor.binaryPath", "");
+// Bridge lines (one per line) for networks that block Tor, e.g. obfs4 or webtunnel.
+pref("browser.freevpn.tor.bridges", "");
+pref("browser.freevpn.system.port", 9050);
+pref("browser.freevpn.custom.type", "socks");
+pref("browser.freevpn.custom.host", "");
+pref("browser.freevpn.custom.port", 1080);
+pref("browser.freevpn.custom.username", "");
+pref("browser.freevpn.custom.password", "");
+pref("browser.freevpn.checkUrl", "https://check.torproject.org/api/ip");
+pref("browser.freevpn.loglevel", "Warn");
+
 // Pref to enable aboug:glean redesign.
 pref("about.glean.redesign.enabled", false);
 

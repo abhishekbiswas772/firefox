@@ -1,0 +1,77 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#PanelUI-freevpn {
+  width: 22em;
+}
+
+#PanelUI-freevpn-content {
+  padding: var(--space-medium) var(--space-large);
+  gap: var(--space-medium);
+}
+
+#freevpn-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-medium);
+}
+
+#freevpn-status-icon {
+  width: 32px;
+  height: 32px;
+  -moz-context-properties: fill, fill-opacity;
+  fill: currentColor;
+}
+
+.freevpn-status-text {
+  flex: 1;
+  min-width: 0;
+
+  > h2 {
+    margin: 0;
+    font-size: var(--font-size-large);
+    font-weight: var(--font-weight-bold);
+  }
+
+  > p {
+    margin: 0;
+    color: var(--text-color-deemphasized);
+    overflow-wrap: anywhere;
+  }
+}
+
+#freevpn-progress {
+  width: 100%;
+}
+
+.freevpn-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-small);
+
+  > [hidden] {
+    display: none;
+  }
+}
+
+.freevpn-settings,
+#freevpn-custom:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-medium);
+}
+
+.freevpn-settings [hidden] {
+  display: none;
+}
+
+.freevpn-footer {
+  margin: 0;
+  font-size: var(--font-size-small);
+  color: var(--text-color-deemphasized);
+}
+
+#freevpn-button {
+  -moz-context-properties: fill, fill-opacity;
+}
