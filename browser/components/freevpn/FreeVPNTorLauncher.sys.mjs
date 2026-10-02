@@ -24,8 +24,9 @@ const TOR_EXE = IS_WIN ? "tor.exe" : "tor";
 const LYREBIRD_EXE = IS_WIN ? "lyrebird.exe" : "lyrebird";
 const BUNDLED_TOR_DIR = "freevpn-tor";
 const PT_DIR = "pluggable_transports";
-// Give up if bootstrap makes no progress for this long, or overall.
-const BOOTSTRAP_STALL_MS = 60 * 1000;
+// Give up if bootstrap makes no progress for this long (the pref, in
+// seconds), or overall.
+const STALL_PREF = "browser.freevpn.tor.stallTimeoutSeconds";
 const BOOTSTRAP_TIMEOUT_MS = 5 * 60 * 1000;
 const SHUTDOWN_TIMEOUT_MS = 3000;
 
@@ -416,16 +417,18 @@ export class FreeVPNTorLauncher {
       lazy.clearTimeout(stallTimer);
       stallTimer = lazy.setTimeout(
         () => ready.reject(new FreeVPNError("tor-timeout", this.#lastProblem)),
-        BOOTSTRAP_STALL_MS
+        Services.prefs.getIntPref(STALL_PREF, 60) * 1000
       );
     };
     resetStallTimer();
 
-    this.#readOutput(proc, ready, resetStallTimer);
-    proc.wait().then(({ exitCode }) => {
+    const outputDone = this.#readOutput(proc, ready, resetStallTimer);
+    proc.wait().then(async ({ exitCode }) => {
       if (this.#proc === proc) {
         this.#proc = null;
       }
+      // Tor's last words (usually the reason it exited) may still be buffered.
+      await outputDone;
       const detail = this.#lastProblem || `exit code ${exitCode}`;
       ready.reject(new FreeVPNError("tor-exited", detail));
       if (!this.#stopping) {

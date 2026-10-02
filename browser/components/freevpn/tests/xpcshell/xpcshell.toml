@@ -9,3 +9,6 @@ run-if = [
 ["test_FreeVPNChannelFilter.js"]
 
 ["test_FreeVPNTorLauncher.js"]
+
+["test_FreeVPNTorProcess.js"]
+run-if = ["os == 'linux'"]

@@ -7,6 +7,7 @@ on:
       - "claude/busy-tesla-k4f33u"
     paths:
       - "browser/components/freevpn/**"
+      - "!browser/components/freevpn/**/*.md"
       - "browser/locales/en-US/browser/freeVpn.ftl"
       - "browser/installer/package-manifest.in"
       - "browser/app/profile/firefox.js"

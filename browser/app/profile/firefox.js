@@ -3860,6 +3860,8 @@ pref("browser.freevpn.tor.bridges", "");
 // "snowflake", "obfs4", "meek" or "custom" (uses browser.freevpn.tor.bridges).
 pref("browser.freevpn.tor.bridgeType", "auto");
 pref("browser.freevpn.tor.lastWorkingBridgeType", "none");
+// Try the next bridge type if Tor's bootstrap makes no progress for this long.
+pref("browser.freevpn.tor.stallTimeoutSeconds", 60);
 // Lets Tor go dormant when idle and reduces connection padding.
 pref("browser.freevpn.batterySaver", true);
 // Split tunneling: sites that skip the VPN, including everything they load.
