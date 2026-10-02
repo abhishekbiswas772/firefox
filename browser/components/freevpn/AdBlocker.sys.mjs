@@ -266,6 +266,9 @@ class AdBlockerService extends EventTarget {
   }
 
   #updateButton(node) {
+    if (!node.ownerDocument?.l10n) {
+      return;
+    }
     const state = this.#state;
     node.setAttribute("adblock-state", state);
     node.style.listStyleImage = `url("${ICON_BASE}adblock-${

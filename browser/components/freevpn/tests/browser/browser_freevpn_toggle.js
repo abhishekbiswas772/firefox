@@ -182,8 +182,9 @@ add_task(async function test_private_only_mode() {
 
   FreeVPN.connect();
   await waitForState(FreeVPNStates.ERROR);
+  // The exit check host is always tunneled, so probe a different site.
   ok(
-    await canFetch(CHECK_URL),
+    await canFetch(CHECK_URL.replace("example.com", "example.org")),
     "Normal windows are not tunneled in private-only mode"
   );
 

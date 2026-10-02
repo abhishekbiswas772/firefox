@@ -29,6 +29,10 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    defaults:
+      run:
+        # Explicit bash adds -o pipefail, so failures piped through tee count.
+        shell: bash
     env:
       MOZCONFIG: ${{ github.workspace }}/browser/components/freevpn/build/mozconfig.linux64
       OBJDIR: obj-freevpn-linux64

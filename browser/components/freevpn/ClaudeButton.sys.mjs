@@ -7,6 +7,7 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   CustomizableUI:
     "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs",
+  EveryWindow: "resource:///modules/EveryWindow.sys.mjs",
 });
 
 export const CLAUDE_URL = "https://claude.ai/new";
@@ -15,6 +16,7 @@ const WIDGET_ID = "claude-button";
 const FEATURE_PREF = "browser.claude.button.enabled";
 const PROVIDER_PREF = "browser.ml.chat.provider";
 const CHAT_ENABLED_PREF = "browser.ml.chat.enabled";
+const EVERY_WINDOW_ID = "claude-button";
 
 /**
  * A one-click toolbar button that opens Claude (claude.ai) in Firefox's AI
@@ -39,8 +41,13 @@ export const ClaudeButton = {
       type: "button",
       defaultArea: lazy.CustomizableUI.AREA_NAVBAR,
       onCommand: event => this.toggle(event.view),
-      onCreated: node => this.trackWindow(node.ownerGlobal),
+      onCreated: node => this.updateButton(node.ownerGlobal),
     });
+    lazy.EveryWindow.registerCallback(
+      EVERY_WINDOW_ID,
+      win => this.trackWindow(win),
+      win => this.untrackWindow(win)
+    );
   },
 
   uninit() {
@@ -48,13 +55,7 @@ export const ClaudeButton = {
       return;
     }
     this._inited = false;
-    for (const win of Services.wm.getEnumerator("navigator:browser")) {
-      this._observers.get(win)?.disconnect();
-      win.removeEventListener("SidebarShown", this);
-      win.document
-        .getElementById("sidebar-box")
-        ?.removeEventListener("sidebar-show", this);
-    }
+    lazy.EveryWindow.unregisterCallback(EVERY_WINDOW_ID);
     this._observers = new WeakMap();
     lazy.CustomizableUI.destroyWidget(WIDGET_ID);
   },
@@ -84,6 +85,11 @@ export const ClaudeButton = {
     return !!sidebar?.isOpen && sidebar.currentID == CHAT_SIDEBAR_ID;
   },
 
+  /**
+   * Called by EveryWindow for every current and future browser window.
+   *
+   * @param {Window} win
+   */
   trackWindow(win) {
     if (this._observers.has(win)) {
       this.updateButton(win);
@@ -106,12 +112,27 @@ export const ClaudeButton = {
   },
 
   /**
+   * @param {Window} win
+   */
+  untrackWindow(win) {
+    this._observers.get(win)?.disconnect();
+    this._observers.delete(win);
+    win.removeEventListener("SidebarShown", this);
+    win.document
+      .getElementById("sidebar-box")
+      ?.removeEventListener("sidebar-show", this);
+  },
+
+  /**
    * Updates the button once the sidebar has finished switching, since some
    * signals arrive before SidebarController's state is updated.
    *
    * @param {Window} win
    */
   scheduleUpdate(win) {
+    if (!win || win.closed) {
+      return;
+    }
     win.setTimeout(() => {
       if (!win.closed) {
         this.updateButton(win);
@@ -120,7 +141,7 @@ export const ClaudeButton = {
   },
 
   updateButton(win) {
-    const node = win.document.getElementById(WIDGET_ID);
+    const node = win?.document?.getElementById(WIDGET_ID);
     if (!node) {
       return;
     }

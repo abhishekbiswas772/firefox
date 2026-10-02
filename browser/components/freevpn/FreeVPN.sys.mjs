@@ -158,6 +158,11 @@ class FreeVPNService extends EventTarget {
   #wanted = false;
   #autoRetries = 0;
   #retryTimer = null;
+  // XPCOM cannot take this object (a DOM EventTarget) as an observer, so a
+  // plain forwarding object is registered instead.
+  #observer = {
+    observe: (subject, topic, data) => this.observe(subject, topic, data),
+  };
 
   progress = 0;
   /** The bridge type of the current Tor connection ("none" if direct). */
@@ -226,9 +231,9 @@ class FreeVPNService extends EventTarget {
       return;
     }
     this.#inited = true;
-    Services.prefs.addObserver(PREF_BRANCH, this);
-    Services.obs.addObserver(this, "network:link-status-changed");
-    Services.obs.addObserver(this, "wake_notification");
+    Services.prefs.addObserver(PREF_BRANCH, this.#observer);
+    Services.obs.addObserver(this.#observer, "network:link-status-changed");
+    Services.obs.addObserver(this.#observer, "wake_notification");
     this.#updateEnabled();
   }
 
@@ -237,9 +242,9 @@ class FreeVPNService extends EventTarget {
       return;
     }
     this.#inited = false;
-    Services.prefs.removeObserver(PREF_BRANCH, this);
-    Services.obs.removeObserver(this, "network:link-status-changed");
-    Services.obs.removeObserver(this, "wake_notification");
+    Services.prefs.removeObserver(PREF_BRANCH, this.#observer);
+    Services.obs.removeObserver(this.#observer, "network:link-status-changed");
+    Services.obs.removeObserver(this.#observer, "wake_notification");
     const wasConnected = this.#state == FreeVPNStates.ON;
     this.disconnect();
     Services.prefs.setBoolPref(WAS_CONNECTED_PREF, wasConnected);
@@ -611,16 +616,24 @@ class FreeVPNService extends EventTarget {
    * @returns {Promise<{ip: string, isTor: boolean}>}
    */
   async #lookupExit() {
+    // AbortSignal.timeout() needs a window, which system modules lack.
+    const controller = new AbortController();
+    const timer = lazy.setTimeout(
+      () => controller.abort(),
+      EXIT_CHECK_TIMEOUT_MS
+    );
     try {
       const response = await fetch(lazy.checkUrl, {
         cache: "no-store",
         credentials: "omit",
-        signal: AbortSignal.timeout(EXIT_CHECK_TIMEOUT_MS),
+        signal: controller.signal,
       });
       const json = await response.json();
       return { ip: String(json.IP ?? ""), isTor: !!json.IsTor };
     } catch (e) {
       throw new lazy.FreeVPNError("proxy-unreachable", e.message);
+    } finally {
+      lazy.clearTimeout(timer);
     }
   }
 

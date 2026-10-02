@@ -461,6 +461,9 @@ export const FreeVPNWidget = {
   updateButton(node) {
     const state = lazy.FreeVPN.state;
     const doc = node.ownerDocument;
+    if (!doc?.l10n) {
+      return;
+    }
     node.setAttribute("freevpn-state", state);
     const button =
       node.querySelector(`#${WIDGET_ID}-button`) ??
