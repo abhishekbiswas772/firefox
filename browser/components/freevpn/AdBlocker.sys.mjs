@@ -115,7 +115,7 @@ class AdBlockerService extends EventTarget {
     if (!this.wanted && addon?.isActive) {
       await addon.disable();
     }
-    this.#setSponsoredPrefs(this.wanted);
+    this.#setSponsoredPrefs(this.wanted && !!addon?.isActive);
     this.#refreshState(addon);
   }
 
