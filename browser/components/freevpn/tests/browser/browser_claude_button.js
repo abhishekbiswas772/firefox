@@ -38,7 +38,11 @@ add_setup(async function () {
     ],
   });
   await hideSidebar();
-  registerCleanupFunction(hideSidebar);
+  registerCleanupFunction(async () => {
+    await hideSidebar();
+    // Defined lazily when the chatbot sidebar opens; the leak check flags it.
+    delete window.SidebarPopupNotifications;
+  });
 });
 
 add_task(function test_defaults() {

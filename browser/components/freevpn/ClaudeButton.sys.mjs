@@ -41,7 +41,7 @@ export const ClaudeButton = {
       type: "button",
       defaultArea: lazy.CustomizableUI.AREA_NAVBAR,
       onCommand: event => this.toggle(event.view),
-      onCreated: node => this.updateButton(node.ownerGlobal),
+      onCreated: node => this.updateButton(node.documentGlobal),
     });
     lazy.EveryWindow.registerCallback(
       EVERY_WINDOW_ID,
@@ -154,7 +154,7 @@ export const ClaudeButton = {
   },
 
   handleEvent(event) {
-    const win = event.currentTarget.ownerGlobal ?? event.currentTarget;
+    const win = event.currentTarget.documentGlobal ?? event.currentTarget;
     this.scheduleUpdate(win);
   },
 };

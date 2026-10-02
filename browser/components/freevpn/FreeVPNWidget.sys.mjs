@@ -146,7 +146,7 @@ class FreeVPNPanel {
 
     const siteBypass = this.#el("moz-checkbox", { id: "site-bypass" }, body);
     siteBypass.addEventListener("change", () => {
-      const win = this.doc.ownerGlobal;
+      const win = this.doc.defaultView;
       const site = currentSite(win);
       if (site) {
         lazy.FreeVPN.setBypassed(site, siteBypass.checked);
@@ -165,7 +165,7 @@ class FreeVPNPanel {
       { id: "check-ip", type: "ghost", l10n: { id: "freevpn-check-ip" } },
       actions
     ).addEventListener("click", () => {
-      this.doc.ownerGlobal.openTrustedLinkIn(TOR_CHECK_PAGE, "tab");
+      this.doc.defaultView.openTrustedLinkIn(TOR_CHECK_PAGE, "tab");
       lazy.CustomizableUI.hidePanelForNode(this.panelview);
     });
 
@@ -313,7 +313,7 @@ class FreeVPNPanel {
       });
     }
 
-    const site = currentSite(this.doc.ownerGlobal);
+    const site = currentSite(this.doc.defaultView);
     const siteBypass = this.#get("site-bypass");
     siteBypass.hidden = !site;
     if (site) {
@@ -445,7 +445,7 @@ export const FreeVPNWidget = {
 
   onViewShowing(event) {
     const panelview = event.target;
-    const win = panelview.ownerGlobal;
+    const win = panelview.documentGlobal;
     let panel = this.panels.get(win);
     if (!panel || panel.panelview != panelview) {
       panel = new FreeVPNPanel(panelview);
