@@ -10,6 +10,10 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   FreeVPNChannelFilter:
     "moz-src:///browser/components/freevpn/FreeVPNChannelFilter.sys.mjs",
+  parseDomainList:
+    "moz-src:///browser/components/freevpn/FreeVPNChannelFilter.sys.mjs",
+  clearTimeout: "resource://gre/modules/Timer.sys.mjs",
+  setTimeout: "resource://gre/modules/Timer.sys.mjs",
   FreeVPNError:
     "moz-src:///browser/components/freevpn/FreeVPNTorLauncher.sys.mjs",
   FreeVPNTorLauncher:
@@ -29,6 +33,15 @@ const ENABLED_PREF = PREF_BRANCH + "enabled";
 const AUTO_CONNECT_PREF = PREF_BRANCH + "autoConnect";
 const WAS_CONNECTED_PREF = PREF_BRANCH + "wasConnected";
 const EXIT_CHECK_TIMEOUT_MS = 30 * 1000;
+const BYPASS_PREF = PREF_BRANCH + "bypassDomains";
+const BRIDGE_TYPE_PREF = PREF_BRANCH + "tor.bridgeType";
+const LAST_BRIDGE_PREF = PREF_BRANCH + "tor.lastWorkingBridgeType";
+// Order tried by the "auto" bridge setting when a direct connection to Tor
+// stalls: Snowflake looks like a video call, obfs4 like random bytes and meek
+// like ordinary HTTPS to a large cloud provider.
+const AUTO_BRIDGE_ORDER = ["none", "snowflake", "obfs4", "meek"];
+const MAX_AUTO_RETRIES = 3;
+const RETRY_DELAY_MS = 5 * 1000;
 
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
@@ -61,6 +74,18 @@ XPCOMUtils.defineLazyPreferenceGetter(
   "",
   null,
   value => value.split(/\r?\n|;/)
+);
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "bridgeType",
+  BRIDGE_TYPE_PREF,
+  "auto"
+);
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "batterySaver",
+  PREF_BRANCH + "batterySaver",
+  true
 );
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
@@ -129,8 +154,14 @@ class FreeVPNService extends EventTarget {
   #launcher = null;
   #connectId = 0;
   #savedSessionPrefs = null;
+  // True while the user wants the VPN on, even if it is reconnecting.
+  #wanted = false;
+  #autoRetries = 0;
+  #retryTimer = null;
 
   progress = 0;
+  /** The bridge type of the current Tor connection ("none" if direct). */
+  bridgeInUse = "none";
   /** @type {{code: string, detail: string}|null} */
   error = null;
   /** @type {{ip: string, isTor: boolean}|null} */
@@ -161,12 +192,43 @@ class FreeVPNService extends EventTarget {
     return this.provider != FreeVPNProviders.CUSTOM;
   }
 
+  /** @returns {Set<string>} Sites that skip the VPN (split tunneling). */
+  get bypassDomains() {
+    return lazy.parseDomainList(Services.prefs.getStringPref(BYPASS_PREF, ""));
+  }
+
+  /**
+   * @param {string} domain - A registrable domain, e.g. "example.com".
+   * @returns {boolean}
+   */
+  isBypassed(domain) {
+    return this.bypassDomains.has(domain.toLowerCase());
+  }
+
+  /**
+   * Adds or removes a site from the split tunneling list.
+   *
+   * @param {string} domain
+   * @param {boolean} bypass
+   */
+  setBypassed(domain, bypass) {
+    const domains = this.bypassDomains;
+    if (bypass) {
+      domains.add(domain.toLowerCase());
+    } else {
+      domains.delete(domain.toLowerCase());
+    }
+    Services.prefs.setStringPref(BYPASS_PREF, [...domains].join(","));
+  }
+
   init() {
     if (this.#inited) {
       return;
     }
     this.#inited = true;
     Services.prefs.addObserver(PREF_BRANCH, this);
+    Services.obs.addObserver(this, "network:link-status-changed");
+    Services.obs.addObserver(this, "wake_notification");
     this.#updateEnabled();
   }
 
@@ -176,6 +238,8 @@ class FreeVPNService extends EventTarget {
     }
     this.#inited = false;
     Services.prefs.removeObserver(PREF_BRANCH, this);
+    Services.obs.removeObserver(this, "network:link-status-changed");
+    Services.obs.removeObserver(this, "wake_notification");
     const wasConnected = this.#state == FreeVPNStates.ON;
     this.disconnect();
     Services.prefs.setBoolPref(WAS_CONNECTED_PREF, wasConnected);
@@ -183,10 +247,29 @@ class FreeVPNService extends EventTarget {
   }
 
   observe(subject, topic, data) {
+    if (
+      topic == "network:link-status-changed" ||
+      topic == "wake_notification"
+    ) {
+      if (
+        (topic == "wake_notification" || data == "up") &&
+        this.#wanted &&
+        this.#state == FreeVPNStates.ERROR
+      ) {
+        this.#autoRetries = 0;
+        this.reconnect();
+      }
+      return;
+    }
     if (topic != "nsPref:changed") {
       return;
     }
     switch (data) {
+      case BYPASS_PREF:
+        if (this.#filter) {
+          this.#filter.bypassDomains = this.bypassDomains;
+        }
+        break;
       case ENABLED_PREF:
         this.#updateEnabled();
         break;
@@ -198,6 +281,8 @@ class FreeVPNService extends EventTarget {
       case PREF_BRANCH + "provider":
       case PREF_BRANCH + "exitCountry":
       case PREF_BRANCH + "tor.bridges":
+      case BRIDGE_TYPE_PREF:
+      case PREF_BRANCH + "batterySaver":
       case PREF_BRANCH + "custom.type":
       case PREF_BRANCH + "custom.host":
       case PREF_BRANCH + "custom.port":
@@ -254,15 +339,19 @@ class FreeVPNService extends EventTarget {
     const connectId = ++this.#connectId;
     const isCurrent = () => connectId == this.#connectId;
 
+    this.#wanted = true;
+    lazy.clearTimeout(this.#retryTimer);
     this.error = null;
     this.exitInfo = null;
     this.progress = 0;
+    this.bridgeInUse = "none";
     this.#setState(FreeVPNStates.CONNECTING);
 
     if (!this.#filter) {
       this.#filter = new lazy.FreeVPNChannelFilter();
     }
     this.#filter.mode = lazy.mode;
+    this.#filter.bypassDomains = this.bypassDomains;
     this.#filter.alwaysTunneledHosts.clear();
     try {
       this.#filter.alwaysTunneledHosts.add(new URL(lazy.checkUrl).host);
@@ -288,6 +377,7 @@ class FreeVPNService extends EventTarget {
       }
       this.exitInfo = exitInfo;
       this.progress = 100;
+      this.#autoRetries = 0;
       this.#setState(FreeVPNStates.ON);
       Services.prefs.setBoolPref(WAS_CONNECTED_PREF, true);
       if (!exitInfo) {
@@ -340,29 +430,92 @@ class FreeVPNService extends EventTarget {
         };
       }
       case FreeVPNProviders.TOR:
-      default: {
-        this.#launcher = new lazy.FreeVPNTorLauncher({
-          onProgress: (percent, tag) => {
-            if (!isCurrent()) {
-              return;
-            }
-            this.progress = percent;
-            this.progressTag = tag;
-            this.#setState(FreeVPNStates.CONNECTING);
-          },
-          onExit: detail => {
-            if (isCurrent() && this.#state == FreeVPNStates.ON) {
-              this.#fail(new lazy.FreeVPNError("tor-exited", detail));
-            }
-          },
-        });
-        const port = await this.#launcher.start({
-          exitCountry: lazy.exitCountry,
-          bridges: lazy.bridges,
-        });
-        return { type: "socks", host: "127.0.0.1", port };
+      default:
+        return this.#startTor(isCurrent);
+    }
+  }
+
+  /**
+   * Starts Tor, falling back to built-in bridges when the bridge setting is
+   * "auto" and a direct connection stalls (e.g. on a censored network).
+   *
+   * @param {function(): boolean} isCurrent
+   */
+  async #startTor(isCurrent) {
+    let attempts = [lazy.bridgeType];
+    if (lazy.bridgeType == "auto") {
+      const available = new Set([
+        "none",
+        ...(await lazy.FreeVPNTorLauncher.availableBridgeTypes()),
+      ]);
+      attempts = AUTO_BRIDGE_ORDER.filter(type => available.has(type));
+      const last = Services.prefs.getStringPref(LAST_BRIDGE_PREF, "none");
+      if (attempts.includes(last)) {
+        attempts = [last, ...attempts.filter(type => type != last)];
       }
     }
+
+    let lastError;
+    for (const bridgeType of attempts) {
+      if (!isCurrent()) {
+        throw new lazy.FreeVPNError("cancelled");
+      }
+      try {
+        const proxy = await this.#launchTor(isCurrent, bridgeType);
+        this.bridgeInUse = bridgeType;
+        if (lazy.bridgeType == "auto") {
+          Services.prefs.setStringPref(LAST_BRIDGE_PREF, bridgeType);
+        }
+        return proxy;
+      } catch (e) {
+        lastError = e;
+        if (e.code != "tor-timeout" && e.code != "bridges-unavailable") {
+          throw e;
+        }
+        lazy.logConsole.warn(`Tor with bridges "${bridgeType}" failed`, e);
+      }
+    }
+    throw lastError;
+  }
+
+  async #launchTor(isCurrent, bridgeType) {
+    this.#launcher = new lazy.FreeVPNTorLauncher({
+      onProgress: (percent, tag) => {
+        if (!isCurrent()) {
+          return;
+        }
+        this.progress = percent;
+        this.progressTag = tag;
+        this.#setState(FreeVPNStates.CONNECTING);
+      },
+      onExit: detail => {
+        if (isCurrent() && this.#state == FreeVPNStates.ON) {
+          this.#fail(new lazy.FreeVPNError("tor-exited", detail));
+          this.#scheduleRetry();
+        }
+      },
+    });
+    this.bridgeInUse = bridgeType;
+    const port = await this.#launcher.start({
+      exitCountry: lazy.exitCountry,
+      bridgeType,
+      customBridges: lazy.bridges,
+      batterySaver: lazy.batterySaver,
+    });
+    return { type: "socks", host: "127.0.0.1", port };
+  }
+
+  #scheduleRetry() {
+    if (!this.#wanted || this.#autoRetries >= MAX_AUTO_RETRIES) {
+      return;
+    }
+    this.#autoRetries++;
+    lazy.clearTimeout(this.#retryTimer);
+    this.#retryTimer = lazy.setTimeout(() => {
+      if (this.#wanted && this.#state == FreeVPNStates.ERROR) {
+        this.reconnect();
+      }
+    }, RETRY_DELAY_MS * this.#autoRetries);
   }
 
   #fail(e) {
@@ -386,6 +539,8 @@ class FreeVPNService extends EventTarget {
    */
   disconnect() {
     this.#connectId++;
+    this.#wanted = false;
+    lazy.clearTimeout(this.#retryTimer);
     this.#filter?.stop();
     this.#launcher?.stop();
     this.#launcher = null;
@@ -401,8 +556,9 @@ class FreeVPNService extends EventTarget {
 
   async reconnect() {
     this.#connectId++;
-    await this.#launcher?.stop();
+    const launcher = this.#launcher;
     this.#launcher = null;
+    await launcher?.stop();
     this.#state = FreeVPNStates.OFF;
     await this.connect();
   }

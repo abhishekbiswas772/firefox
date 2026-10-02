@@ -23,7 +23,10 @@ const IS_WIN = AppConstants.platform == "win";
 const TOR_EXE = IS_WIN ? "tor.exe" : "tor";
 const LYREBIRD_EXE = IS_WIN ? "lyrebird.exe" : "lyrebird";
 const BUNDLED_TOR_DIR = "freevpn-tor";
-const BOOTSTRAP_TIMEOUT_MS = 180 * 1000;
+const PT_DIR = "pluggable_transports";
+// Give up if bootstrap makes no progress for this long, or overall.
+const BOOTSTRAP_STALL_MS = 60 * 1000;
+const BOOTSTRAP_TIMEOUT_MS = 5 * 60 * 1000;
 const SHUTDOWN_TIMEOUT_MS = 3000;
 
 const BOOTSTRAP_RE = /Bootstrapped (\d+)%(?: \(([\w-]+)\))?/;
@@ -41,7 +44,8 @@ const ERROR_RE = /\[(?:err|warn)\] (.*)$/;
  * @param {string} [options.geoipFile]
  * @param {string} [options.geoip6File]
  * @param {string[]} [options.bridges] - Bridge lines, e.g. "obfs4 1.2.3.4:443 ...".
- * @param {string} [options.lyrebirdPath] - Pluggable transport binary.
+ * @param {string[]} [options.transportPlugins] - ClientTransportPlugin lines.
+ * @param {boolean} [options.batterySaver] - Less padding, sleep when idle.
  * @returns {string}
  */
 export function buildTorrc({
@@ -51,7 +55,8 @@ export function buildTorrc({
   geoipFile,
   geoip6File,
   bridges = [],
-  lyrebirdPath,
+  transportPlugins = [],
+  batterySaver = false,
 }) {
   const lines = [
     "SocksPort 127.0.0.1:auto IsolateSOCKSAuth",
@@ -72,19 +77,50 @@ export function buildTorrc({
   if (exitCountry && /^[a-z]{2}$/i.test(exitCountry)) {
     lines.push(`ExitNodes {${exitCountry.toLowerCase()}}`, "StrictNodes 1");
   }
-  const bridgeLines = bridges.map(b => b.trim()).filter(Boolean);
+  if (batterySaver) {
+    lines.push(
+      "ReducedConnectionPadding 1",
+      "DormantClientTimeout 10 minutes",
+      "DormantTimeoutDisabledByIdleStreams 1"
+    );
+  }
+  const bridgeLines = bridges
+    .map(b => oneLine(b).replace(/^Bridge\s+/i, ""))
+    .filter(Boolean);
   if (bridgeLines.length) {
     lines.push("UseBridges 1");
-    if (lyrebirdPath) {
-      lines.push(
-        `ClientTransportPlugin meek_lite,obfs2,obfs3,obfs4,scramblesuit,webtunnel exec ${quote(lyrebirdPath)}`
-      );
+    for (const plugin of transportPlugins) {
+      lines.push(oneLine(plugin));
     }
     for (const bridge of bridgeLines) {
-      lines.push(`Bridge ${bridge.replace(/^Bridge\s+/i, "")}`);
+      lines.push(`Bridge ${bridge}`);
     }
   }
   return lines.join("\n") + "\n";
+}
+
+function oneLine(value) {
+  return value.replace(/[\r\n]+/g, " ").trim();
+}
+
+/**
+ * Reads the pt_config.json that ships with the Tor Expert Bundle.
+ *
+ * @param {object} config - Parsed pt_config.json.
+ * @param {string} ptPath - Prefix substituted for ${pt_path}.
+ * @returns {{transportPlugins: string[], bridges: {[type: string]: string[]}}}
+ */
+export function parsePtConfig(config, ptPath) {
+  const transportPlugins = Object.values(config?.pluggableTransports ?? {})
+    .filter(line => typeof line == "string")
+    .map(line => line.replaceAll("${pt_path}", ptPath));
+  const bridges = {};
+  for (const [type, list] of Object.entries(config?.bridges ?? {})) {
+    if (Array.isArray(list)) {
+      bridges[type] = list.filter(line => typeof line == "string");
+    }
+  }
+  return { transportPlugins, bridges };
 }
 
 function quote(path) {
@@ -220,12 +256,12 @@ export class FreeVPNTorLauncher {
   }
 
   /**
-   * Looks for the GeoIP databases and the lyrebird transport that ship with
+   * Looks for the GeoIP databases and pluggable transports that ship with
    * the Tor Expert Bundle, relative to the tor binary.
    *
    * @param {string} torPath
    */
-  static async #findSupportFiles(torPath) {
+  static async findSupportFiles(torPath) {
     const torDir = PathUtils.parent(torPath);
     const bundleDir = PathUtils.parent(torDir);
     const pick = async paths => {
@@ -236,6 +272,32 @@ export class FreeVPNTorLauncher {
       }
       return undefined;
     };
+
+    let pt = { transportPlugins: [], bridges: {} };
+    const ptConfigPath = PathUtils.join(torDir, PT_DIR, "pt_config.json");
+    if (await IOUtils.exists(ptConfigPath)) {
+      try {
+        // Relative to the working directory (the tor directory), because
+        // ClientTransportPlugin cannot quote paths that contain spaces.
+        const sep = IS_WIN ? "\\" : "/";
+        pt = parsePtConfig(await IOUtils.readJSON(ptConfigPath), PT_DIR + sep);
+      } catch (e) {
+        lazy.logConsole.warn("Could not read pt_config.json", e);
+      }
+    }
+    if (!pt.transportPlugins.length) {
+      const lyrebird = await pick([
+        PathUtils.join(torDir, LYREBIRD_EXE),
+        "/usr/bin/lyrebird",
+        "/usr/bin/obfs4proxy",
+      ]);
+      if (lyrebird && !/\s/.test(lyrebird)) {
+        pt.transportPlugins.push(
+          `ClientTransportPlugin meek_lite,obfs2,obfs3,obfs4,scramblesuit,webtunnel exec ${lyrebird}`
+        );
+      }
+    }
+
     return {
       geoipFile: await pick([
         PathUtils.join(bundleDir, "data", "geoip"),
@@ -245,13 +307,23 @@ export class FreeVPNTorLauncher {
         PathUtils.join(bundleDir, "data", "geoip6"),
         PathUtils.join(torDir, "geoip6"),
       ]),
-      lyrebirdPath: await pick([
-        PathUtils.join(torDir, "pluggable_transports", LYREBIRD_EXE),
-        PathUtils.join(torDir, LYREBIRD_EXE),
-        "/usr/bin/lyrebird",
-        "/usr/bin/obfs4proxy",
-      ]),
+      ...pt,
     };
+  }
+
+  /**
+   * Returns the built-in bridge types available with the installed Tor,
+   * e.g. ["snowflake", "obfs4", "meek"].
+   *
+   * @returns {Promise<string[]>}
+   */
+  static async availableBridgeTypes() {
+    const torPath = await FreeVPNTorLauncher.findTorBinary();
+    if (!torPath) {
+      return [];
+    }
+    const { bridges } = await FreeVPNTorLauncher.findSupportFiles(torPath);
+    return Object.keys(bridges).filter(type => bridges[type].length);
   }
 
   /**
@@ -259,10 +331,18 @@ export class FreeVPNTorLauncher {
    *
    * @param {object} options
    * @param {string} [options.exitCountry]
-   * @param {string[]} [options.bridges]
+   * @param {string} [options.bridgeType] - "none", "custom", or a built-in
+   *   bridge type from pt_config.json such as "snowflake" or "obfs4".
+   * @param {string[]} [options.customBridges] - Used for "custom".
+   * @param {boolean} [options.batterySaver]
    * @returns {Promise<number>} The SOCKS port Tor is listening on.
    */
-  async start({ exitCountry = "", bridges = [] } = {}) {
+  async start({
+    exitCountry = "",
+    bridgeType = "none",
+    customBridges = [],
+    batterySaver = false,
+  } = {}) {
     if (this.#proc) {
       throw new Error("Tor is already running");
     }
@@ -284,7 +364,17 @@ export class FreeVPNTorLauncher {
       await IOUtils.setPermissions(dataDir, 0o700);
     }
 
-    const support = await FreeVPNTorLauncher.#findSupportFiles(torPath);
+    const support = await FreeVPNTorLauncher.findSupportFiles(torPath);
+    let bridges = [];
+    if (bridgeType == "custom") {
+      bridges = customBridges;
+    } else if (bridgeType != "none") {
+      bridges = support.bridges[bridgeType] ?? [];
+      if (!bridges.length) {
+        throw new FreeVPNError("bridges-unavailable", bridgeType);
+      }
+    }
+
     const torrcPath = PathUtils.join(dataDir, "torrc");
     await IOUtils.writeUTF8(
       torrcPath,
@@ -292,8 +382,11 @@ export class FreeVPNTorLauncher {
         dataDir,
         ownerPid: Services.appinfo.processID,
         exitCountry,
+        geoipFile: support.geoipFile,
+        geoip6File: support.geoip6File,
         bridges,
-        ...support,
+        transportPlugins: support.transportPlugins,
+        batterySaver,
       })
     );
 
@@ -302,7 +395,7 @@ export class FreeVPNTorLauncher {
       environment.LD_LIBRARY_PATH = PathUtils.parent(torPath);
     }
 
-    lazy.logConsole.info(`Launching ${torPath}`);
+    lazy.logConsole.info(`Launching ${torPath} (bridges: ${bridgeType})`);
     this.#proc = await lazy.Subprocess.call({
       command: torPath,
       arguments: ["-f", torrcPath, "--ignore-missing-torrc"],
@@ -314,12 +407,21 @@ export class FreeVPNTorLauncher {
 
     const proc = this.#proc;
     const ready = Promise.withResolvers();
-    const timer = lazy.setTimeout(
-      () => ready.reject(new FreeVPNError("tor-timeout")),
+    const overallTimer = lazy.setTimeout(
+      () => ready.reject(new FreeVPNError("tor-timeout", this.#lastProblem)),
       BOOTSTRAP_TIMEOUT_MS
     );
+    let stallTimer = null;
+    const resetStallTimer = () => {
+      lazy.clearTimeout(stallTimer);
+      stallTimer = lazy.setTimeout(
+        () => ready.reject(new FreeVPNError("tor-timeout", this.#lastProblem)),
+        BOOTSTRAP_STALL_MS
+      );
+    };
+    resetStallTimer();
 
-    this.#readOutput(proc, ready);
+    this.#readOutput(proc, ready, resetStallTimer);
     proc.wait().then(({ exitCode }) => {
       if (this.#proc === proc) {
         this.#proc = null;
@@ -337,14 +439,16 @@ export class FreeVPNTorLauncher {
       await this.stop();
       throw e;
     } finally {
-      lazy.clearTimeout(timer);
+      lazy.clearTimeout(overallTimer);
+      lazy.clearTimeout(stallTimer);
     }
     return this.#socksPort;
   }
 
-  async #readOutput(proc, ready) {
+  async #readOutput(proc, ready, onAdvance) {
     let buffer = "";
     let bootstrapped = false;
+    let lastPercent = -1;
     try {
       let chunk;
       while ((chunk = await proc.stdout.readString())) {
@@ -361,6 +465,10 @@ export class FreeVPNTorLauncher {
             this.#socksPort = parsed.socksPort;
           }
           if (parsed.bootstrap !== undefined) {
+            if (parsed.bootstrap > lastPercent) {
+              lastPercent = parsed.bootstrap;
+              onAdvance();
+            }
             this.#onProgress(parsed.bootstrap, parsed.tag ?? "");
             bootstrapped = parsed.bootstrap == 100;
           }
@@ -399,7 +507,8 @@ export class FreeVPNTorLauncher {
 export class FreeVPNError extends Error {
   /**
    * @param {string} code - One of "tor-not-found", "tor-timeout",
-   *   "tor-exited", "proxy-unreachable", "custom-not-configured".
+   *   "tor-exited", "bridges-unavailable", "proxy-unreachable",
+   *   "custom-not-configured".
    * @param {string} [detail] - Untranslated technical detail.
    */
   constructor(code, detail = "") {

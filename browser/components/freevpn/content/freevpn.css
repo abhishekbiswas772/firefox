@@ -49,10 +49,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-small);
+}
 
-  > [hidden] {
-    display: none;
-  }
+#PanelUI-freevpn-content [hidden] {
+  display: none;
 }
 
 .freevpn-settings,
@@ -62,16 +62,12 @@
   gap: var(--space-medium);
 }
 
-.freevpn-settings [hidden] {
-  display: none;
-}
-
 .freevpn-footer {
   margin: 0;
   font-size: var(--font-size-small);
   color: var(--text-color-deemphasized);
 }
 
-#freevpn-button {
+#freevpn-button-button {
   -moz-context-properties: fill, fill-opacity;
 }

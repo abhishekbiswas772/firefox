@@ -9,16 +9,19 @@ freevpn-title = Free VPN
 
 freevpn-button =
     .label = Free VPN
-    .tooltiptext = Free VPN is off
+    .tooltiptext = Free VPN is off. Click to turn on.
 freevpn-button-on =
     .label = Free VPN
-    .tooltiptext = Free VPN is on
+    .tooltiptext = Free VPN is on. Click to turn off.
 freevpn-button-connecting =
     .label = Free VPN
-    .tooltiptext = Free VPN is connecting…
+    .tooltiptext = Free VPN is connecting… Click to cancel.
 freevpn-button-error =
     .label = Free VPN
-    .tooltiptext = Free VPN could not connect
+    .tooltiptext = Free VPN could not connect. Click to turn off.
+freevpn-dropmarker =
+    .label = Free VPN settings
+    .tooltiptext = Free VPN settings
 
 freevpn-toggle =
     .label = Use free VPN
@@ -32,6 +35,10 @@ freevpn-status-error = Could not connect
 # Variables:
 #   $percent (Number) - How far the Tor connection has progressed, 0 to 100.
 freevpn-detail-connecting = Building a private connection ({ $percent }%)
+# Variables:
+#   $percent (Number) - How far the Tor connection has progressed, 0 to 100.
+#   $bridge (String) - Bridge type, e.g. "snowflake". Not translated.
+freevpn-detail-connecting-bridge = Getting past network blocking with a { $bridge } bridge ({ $percent }%)
 freevpn-detail-on = Your browsing is hidden from your network.
 # Variables:
 #   $ip (String) - The public IP address websites now see.
@@ -53,12 +60,21 @@ freevpn-error-tor-exited =
     .message = Tor stopped unexpectedly: { $detail }
 freevpn-error-proxy-unreachable =
     .message = Could not reach the proxy server. Check that it is running. ({ $detail })
+freevpn-error-bridges-unavailable =
+    .message = No built-in “{ $detail }” bridges are available. Install the Tor Expert Bundle or choose another bridge type.
 freevpn-error-custom-not-configured =
     .message = Enter the host and port of your proxy server.
 freevpn-error-unknown =
     .message = Something went wrong: { $detail }
 
 ##
+
+# Split tunneling for one site.
+# Variables:
+#   $site (String) - The site, e.g. "example.com".
+freevpn-site-bypass =
+    .label = Don’t use VPN on { $site }
+    .description = Use this for video calls and sites that block VPNs.
 
 freevpn-new-identity =
     .label = New identity
@@ -79,6 +95,21 @@ freevpn-location =
 freevpn-location-auto =
     .label = Automatic (fastest)
 
+freevpn-bridges =
+    .label = Bridges (for networks that block Tor)
+freevpn-bridges-auto =
+    .label = Automatic
+freevpn-bridges-none =
+    .label = Off
+freevpn-bridges-snowflake =
+    .label = Snowflake
+freevpn-bridges-obfs4 =
+    .label = obfs4
+freevpn-bridges-meek =
+    .label = meek (cloud)
+freevpn-bridges-custom =
+    .label = My own bridges (browser.freevpn.tor.bridges)
+
 freevpn-custom-type =
     .label = Proxy type
 freevpn-custom-type-socks =
@@ -96,6 +127,9 @@ freevpn-private-only =
     .label = Only use the VPN in private windows
 freevpn-kill-switch =
     .label = Block browsing if the VPN disconnects
+freevpn-battery-saver =
+    .label = Battery saver
+    .description = Lets Tor sleep when you are not browsing and sends less padding.
 freevpn-auto-connect =
     .label = Reconnect when { -brand-short-name } starts
 

@@ -3,10 +3,16 @@
 
 "use strict";
 
-const { FreeVPNChannelFilter, FreeVPNMode, isLocalHost, makeProxyInfo } =
-  ChromeUtils.importESModule(
-    "moz-src:///browser/components/freevpn/FreeVPNChannelFilter.sys.mjs"
-  );
+const {
+  FreeVPNChannelFilter,
+  FreeVPNMode,
+  hostMatchesDomains,
+  isLocalHost,
+  makeProxyInfo,
+  parseDomainList,
+} = ChromeUtils.importESModule(
+  "moz-src:///browser/components/freevpn/FreeVPNChannelFilter.sys.mjs"
+);
 const { NetUtil } = ChromeUtils.importESModule(
   "resource://gre/modules/NetUtil.sys.mjs"
 );
@@ -107,4 +113,32 @@ add_task(async function test_kill_switch() {
 
   const local = await applyFilter(filter, makeChannel("http://localhost/"));
   Assert.equal(local, null, "Local traffic is never blocked");
+});
+
+add_task(function test_parseDomainList() {
+  Assert.deepEqual(
+    [
+      ...parseDomainList(
+        " Meet.Google.com, *.zoom.us\nbad value,localhost,.x.org"
+      ),
+    ],
+    ["meet.google.com", "zoom.us", "x.org"]
+  );
+  Assert.equal(parseDomainList("").size, 0);
+});
+
+add_task(function test_hostMatchesDomains() {
+  const domains = new Set(["zoom.us"]);
+  Assert.ok(hostMatchesDomains("zoom.us", domains));
+  Assert.ok(hostMatchesDomains("us02web.ZOOM.us", domains));
+  Assert.ok(!hostMatchesDomains("notzoom.us", domains));
+  Assert.ok(!hostMatchesDomains("zoom.us.evil.com", domains));
+});
+
+add_task(function test_split_tunneling() {
+  const filter = new FreeVPNChannelFilter();
+  filter.bypassDomains = new Set(["meet.google.com"]);
+  Assert.ok(!filter.shouldProxy(makeChannel("https://meet.google.com/abc")));
+  Assert.ok(filter.shouldProxy(makeChannel("https://google.com/")));
+  Assert.ok(filter.shouldProxy(makeChannel("https://example.com/")));
 });

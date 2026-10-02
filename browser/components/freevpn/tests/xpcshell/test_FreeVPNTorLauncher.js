@@ -3,9 +3,10 @@
 
 "use strict";
 
-const { buildTorrc, parseTorLogLine } = ChromeUtils.importESModule(
-  "moz-src:///browser/components/freevpn/FreeVPNTorLauncher.sys.mjs"
-);
+const { buildTorrc, parsePtConfig, parseTorLogLine } =
+  ChromeUtils.importESModule(
+    "moz-src:///browser/components/freevpn/FreeVPNTorLauncher.sys.mjs"
+  );
 
 add_task(function test_buildTorrc_minimal() {
   const torrc = buildTorrc({ dataDir: "/tmp/tor data" });
@@ -33,14 +34,78 @@ add_task(function test_buildTorrc_bridges() {
   const torrc = buildTorrc({
     dataDir: "/d",
     bridges: ["", "obfs4 1.2.3.4:443 FINGERPRINT cert=x iat-mode=0", "  "],
-    lyrebirdPath: "/opt/lyrebird",
+    transportPlugins: [
+      "ClientTransportPlugin obfs4 exec pluggable_transports/lyrebird",
+    ],
   });
   Assert.ok(torrc.includes("UseBridges 1"));
-  Assert.ok(torrc.includes('exec "/opt/lyrebird"'));
+  Assert.ok(
+    torrc.includes(
+      "ClientTransportPlugin obfs4 exec pluggable_transports/lyrebird"
+    )
+  );
   Assert.ok(
     torrc.includes("Bridge obfs4 1.2.3.4:443 FINGERPRINT cert=x iat-mode=0")
   );
   Assert.equal(torrc.match(/^Bridge /gm).length, 1);
+});
+
+add_task(function test_buildTorrc_noBridgesNoTransports() {
+  const torrc = buildTorrc({
+    dataDir: "/d",
+    transportPlugins: ["ClientTransportPlugin obfs4 exec lyrebird"],
+  });
+  Assert.ok(!torrc.includes("ClientTransportPlugin"));
+  Assert.ok(!torrc.includes("UseBridges"));
+});
+
+add_task(function test_buildTorrc_noInjection() {
+  const torrc = buildTorrc({
+    dataDir: "/d",
+    bridges: ["obfs4 1.2.3.4:443 X\nSocksPort 0.0.0.0:9050"],
+  });
+  Assert.ok(!/^SocksPort 0\.0\.0\.0/m.test(torrc));
+});
+
+add_task(function test_buildTorrc_batterySaver() {
+  Assert.ok(
+    buildTorrc({ dataDir: "/d", batterySaver: true }).includes(
+      "ReducedConnectionPadding 1"
+    )
+  );
+  Assert.ok(
+    !buildTorrc({ dataDir: "/d" }).includes("ReducedConnectionPadding")
+  );
+});
+
+add_task(function test_parsePtConfig() {
+  const config = {
+    recommendedDefault: "obfs4",
+    pluggableTransports: {
+      lyrebird:
+        "ClientTransportPlugin meek_lite,obfs4,webtunnel exec ${pt_path}lyrebird",
+      snowflake:
+        "ClientTransportPlugin snowflake exec ${pt_path}snowflake-client",
+    },
+    bridges: {
+      obfs4: ["obfs4 192.0.2.1:443 A cert=b iat-mode=0"],
+      snowflake: ["snowflake 192.0.2.3:80 B fingerprint=C url=https://x/"],
+      bogus: "not an array",
+    },
+  };
+  const { transportPlugins, bridges } = parsePtConfig(
+    config,
+    "pluggable_transports/"
+  );
+  Assert.deepEqual(transportPlugins, [
+    "ClientTransportPlugin meek_lite,obfs4,webtunnel exec pluggable_transports/lyrebird",
+    "ClientTransportPlugin snowflake exec pluggable_transports/snowflake-client",
+  ]);
+  Assert.deepEqual(Object.keys(bridges).sort(), ["obfs4", "snowflake"]);
+  Assert.deepEqual(parsePtConfig(null, "x/"), {
+    transportPlugins: [],
+    bridges: {},
+  });
 });
 
 add_task(function test_parseTorLogLine() {

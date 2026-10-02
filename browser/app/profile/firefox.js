@@ -3852,6 +3852,15 @@ pref("browser.freevpn.widgetAdded", false);
 pref("browser.freevpn.tor.binaryPath", "");
 // Bridge lines (one per line) for networks that block Tor, e.g. obfs4 or webtunnel.
 pref("browser.freevpn.tor.bridges", "");
+// "auto" (direct, then built-in snowflake/obfs4/meek bridges), "none",
+// "snowflake", "obfs4", "meek" or "custom" (uses browser.freevpn.tor.bridges).
+pref("browser.freevpn.tor.bridgeType", "auto");
+pref("browser.freevpn.tor.lastWorkingBridgeType", "none");
+// Lets Tor go dormant when idle and reduces connection padding.
+pref("browser.freevpn.batterySaver", true);
+// Split tunneling: sites that skip the VPN, including everything they load.
+// Video and audio calls need UDP, which cannot go through Tor.
+pref("browser.freevpn.bypassDomains", "meet.google.com,zoom.us,zoom.com,teams.microsoft.com,teams.live.com,teams.cloud.microsoft,whereby.com,meet.jit.si,8x8.vc,discord.com,web.whatsapp.com,web.telegram.org,app.slack.com,webex.com,messenger.com");
 pref("browser.freevpn.system.port", 9050);
 pref("browser.freevpn.custom.type", "socks");
 pref("browser.freevpn.custom.host", "");

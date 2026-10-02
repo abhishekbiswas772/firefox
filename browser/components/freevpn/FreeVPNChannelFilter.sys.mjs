@@ -23,11 +23,11 @@ export const FreeVPNMode = Object.freeze({
 
 /**
  * @typedef {object} FreeVPNProxy
- * @property {"socks"|"socks4"|"http"|"https"} type
- * @property {string} host
- * @property {number} port
- * @property {string} [username]
- * @property {string} [password]
+ * @property {"socks"|"socks4"|"http"|"https"} type - Proxy protocol.
+ * @property {string} host - Proxy host name or IP address.
+ * @property {number} port - Proxy port.
+ * @property {string} [username] - Proxy user name, if it needs one.
+ * @property {string} [password] - Proxy password, if it needs one.
  */
 
 /**
@@ -88,6 +88,43 @@ export function isLocalHost(host) {
 }
 
 /**
+ * Returns true if host is domain or one of its subdomains.
+ *
+ * @param {string} host
+ * @param {Iterable<string>} domains
+ * @returns {boolean}
+ */
+export function hostMatchesDomains(host, domains) {
+  host = host.toLowerCase();
+  for (const domain of domains) {
+    if (host == domain || host.endsWith("." + domain)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Parses the comma or whitespace separated split tunneling list.
+ *
+ * @param {string} value
+ * @returns {Set<string>}
+ */
+export function parseDomainList(value) {
+  return new Set(
+    value
+      .split(/[\s,]+/)
+      .map(d =>
+        d
+          .trim()
+          .toLowerCase()
+          .replace(/^\*?\./, "")
+      )
+      .filter(d => /^[a-z0-9.-]+$/.test(d) && d.includes("."))
+  );
+}
+
+/**
  * Routes browser channels through the active free VPN tunnel.
  *
  * While the tunnel is connecting, channels that should be tunneled are held
@@ -110,6 +147,14 @@ export class FreeVPNChannelFilter {
    * @type {Set<string>}
    */
   alwaysTunneledHosts = new Set();
+
+  /**
+   * Split tunneling: sites (and everything they load) that use the normal
+   * connection. Used for video calls, which cannot run over Tor.
+   *
+   * @type {Set<string>}
+   */
+  bypassDomains = new Set();
 
   QueryInterface = ChromeUtils.generateQI(["nsIProtocolProxyChannelFilter"]);
 
@@ -259,6 +304,9 @@ export class FreeVPNChannelFilter {
     ) {
       return false;
     }
+    if (this.bypassDomains.size && this.#isBypassed(channel, host)) {
+      return false;
+    }
     if (
       this.#mode == FreeVPNMode.PRIVATE &&
       !this.alwaysTunneledHosts.has(host)
@@ -266,5 +314,27 @@ export class FreeVPNChannelFilter {
       return !!channel.loadInfo?.originAttributes.privateBrowsingId;
     }
     return true;
+  }
+
+  #isBypassed(channel, host) {
+    if (hostMatchesDomains(host, this.bypassDomains)) {
+      return true;
+    }
+    const loadInfo = channel.loadInfo;
+    // For a top-level navigation the top document is still the page being
+    // left, so only the destination host counts.
+    if (
+      !loadInfo ||
+      loadInfo.externalContentPolicyType == Ci.nsIContentPolicy.TYPE_DOCUMENT
+    ) {
+      return false;
+    }
+    let topHost = "";
+    try {
+      topHost = loadInfo.browsingContext?.top?.currentURI?.host ?? "";
+    } catch (e) {
+      return false;
+    }
+    return !!topHost && hostMatchesDomains(topHost, this.bypassDomains);
   }
 }

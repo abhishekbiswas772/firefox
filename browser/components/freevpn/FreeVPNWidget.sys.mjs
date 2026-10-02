@@ -20,6 +20,52 @@ const ADDED_PREF = "browser.freevpn.widgetAdded";
 const PREF_BRANCH = "browser.freevpn.";
 const TOR_CHECK_PAGE = "https://check.torproject.org/";
 const ICON_BASE = "chrome://browser/content/freevpn/";
+const BRIDGE_TYPES = ["auto", "none", "snowflake", "obfs4", "meek", "custom"];
+
+// Checkbox id -> boolean pref name under browser.freevpn., and its default.
+const BOOL_PREFS = {
+  "kill-switch": ["killSwitch", true],
+  "battery-saver": ["batterySaver", true],
+  "auto-connect": ["autoConnect", false],
+};
+
+const ICONS = {
+  on: "on",
+  connecting: "connecting",
+  error: "error",
+};
+
+const BUTTON_L10N = {
+  on: "freevpn-button-on",
+  connecting: "freevpn-button-connecting",
+  error: "freevpn-button-error",
+};
+
+function iconURL(state) {
+  return `${ICON_BASE}freevpn-${ICONS[state] ?? "off"}.svg`;
+}
+
+function getString(pref, fallback) {
+  return Services.prefs.getStringPref(PREF_BRANCH + pref, fallback);
+}
+
+/**
+ * Returns the site a tab is showing, as used for split tunneling.
+ *
+ * @param {Window} win - A browser window.
+ * @returns {string} The registrable domain, or "" for non-web pages.
+ */
+export function currentSite(win) {
+  const uri = win.gBrowser?.selectedBrowser?.currentURI;
+  if (!uri?.schemeIs("http") && !uri?.schemeIs("https")) {
+    return "";
+  }
+  try {
+    return Services.eTLD.getBaseDomain(uri);
+  } catch (e) {
+    return uri.host;
+  }
+}
 
 /**
  * Builds and updates the contents of the free VPN panel for one window.
@@ -44,7 +90,7 @@ class FreeVPNPanel {
         this.#els.set(value, el);
         el.id = `freevpn-${value}`;
       } else if (key == "l10n") {
-        this.doc.l10n.setAttributes(el, value);
+        this.doc.l10n.setAttributes(el, value.id, value.args);
       } else if (value === true) {
         el.setAttribute(key, "");
       } else if (value !== false && value !== null && value !== undefined) {
@@ -57,6 +103,17 @@ class FreeVPNPanel {
 
   #get(id) {
     return this.#els.get(id);
+  }
+
+  #select(id, l10nId, options, pref, parent) {
+    const select = this.#el("moz-select", { id, l10n: { id: l10nId } }, parent);
+    for (const option of options) {
+      this.#el("moz-option", option, select);
+    }
+    select.addEventListener("change", () =>
+      Services.prefs.setStringPref(PREF_BRANCH + pref, select.value)
+    );
+    return select;
   }
 
   build() {
@@ -79,16 +136,24 @@ class FreeVPNPanel {
     );
     this.#el("h2", { id: "status-title" }, statusText);
     this.#el("p", { id: "status-detail" }, statusText);
-    const toggle = this.#el(
+    this.#el(
       "moz-toggle",
       { id: "toggle", l10n: { id: "freevpn-toggle" } },
       status
-    );
-    toggle.addEventListener("toggle", () => lazy.FreeVPN.toggle());
+    ).addEventListener("toggle", () => lazy.FreeVPN.toggle());
 
     this.#el("progress", { id: "progress", max: "100", value: "0" }, body);
-
     this.#el("moz-message-bar", { id: "error", type: "error" }, body);
+
+    const siteBypass = this.#el("moz-checkbox", { id: "site-bypass" }, body);
+    siteBypass.addEventListener("change", () => {
+      const win = this.doc.ownerGlobal;
+      const site = currentSite(win);
+      if (site) {
+        lazy.FreeVPN.setBypassed(site, siteBypass.checked);
+        win.gBrowser.reload();
+      }
+    });
 
     const actions = this.#el("div", { class: "freevpn-actions" }, body);
     this.#el(
@@ -109,64 +174,54 @@ class FreeVPNPanel {
 
     const settings = this.#el("div", { class: "freevpn-settings" }, body);
 
-    const provider = this.#el(
-      "moz-select",
-      { id: "provider", l10n: { id: "freevpn-provider" } },
+    this.#select(
+      "provider",
+      "freevpn-provider",
+      [
+        [lazy.FreeVPNProviders.TOR, "freevpn-provider-tor"],
+        [lazy.FreeVPNProviders.TOR_SYSTEM, "freevpn-provider-tor-system"],
+        [lazy.FreeVPNProviders.CUSTOM, "freevpn-provider-custom"],
+      ].map(([value, id]) => ({ value, l10n: { id } })),
+      "provider",
       settings
-    );
-    for (const [value, l10nId] of [
-      [lazy.FreeVPNProviders.TOR, "freevpn-provider-tor"],
-      [lazy.FreeVPNProviders.TOR_SYSTEM, "freevpn-provider-tor-system"],
-      [lazy.FreeVPNProviders.CUSTOM, "freevpn-provider-custom"],
-    ]) {
-      this.#el("moz-option", { value, l10n: { id: l10nId } }, provider);
-    }
-    provider.addEventListener("change", () =>
-      Services.prefs.setStringPref(PREF_BRANCH + "provider", provider.value)
     );
 
-    const location = this.#el(
-      "moz-select",
-      { id: "location", l10n: { id: "freevpn-location" } },
-      settings
-    );
-    this.#el(
-      "moz-option",
-      { value: "", l10n: { id: "freevpn-location-auto" } },
-      location
-    );
     const regionNames = new Services.intl.DisplayNames(undefined, {
       type: "region",
     });
     const countries = lazy.FREEVPN_COUNTRIES.map(code => ({
-      code,
-      name: regionNames.of(code.toUpperCase()),
-    })).sort((a, b) => a.name.localeCompare(b.name));
-    for (const { code, name } of countries) {
-      this.#el("moz-option", { value: code, label: name }, location);
-    }
-    location.addEventListener("change", () =>
-      Services.prefs.setStringPref(PREF_BRANCH + "exitCountry", location.value)
+      value: code,
+      label: regionNames.of(code.toUpperCase()),
+    })).sort((a, b) => a.label.localeCompare(b.label));
+    this.#select(
+      "location",
+      "freevpn-location",
+      [{ value: "", l10n: { id: "freevpn-location-auto" } }, ...countries],
+      "exitCountry",
+      settings
+    );
+
+    this.#select(
+      "bridges",
+      "freevpn-bridges",
+      BRIDGE_TYPES.map(value => ({
+        value,
+        l10n: { id: `freevpn-bridges-${value}` },
+      })),
+      "tor.bridgeType",
+      settings
     );
 
     const custom = this.#el("div", { id: "custom" }, settings);
-    const customType = this.#el(
-      "moz-select",
-      { id: "custom-type", l10n: { id: "freevpn-custom-type" } },
+    this.#select(
+      "custom-type",
+      "freevpn-custom-type",
+      ["socks", "http", "https"].map(value => ({
+        value,
+        l10n: { id: `freevpn-custom-type-${value}` },
+      })),
+      "custom.type",
       custom
-    );
-    for (const value of ["socks", "http", "https"]) {
-      this.#el(
-        "moz-option",
-        { value, l10n: { id: `freevpn-custom-type-${value}` } },
-        customType
-      );
-    }
-    customType.addEventListener("change", () =>
-      Services.prefs.setStringPref(
-        PREF_BRANCH + "custom.type",
-        customType.value
-      )
     );
     const customHost = this.#el(
       "moz-input-text",
@@ -200,26 +255,26 @@ class FreeVPNPanel {
       }
     });
 
-    for (const [id, pref, l10nId] of [
-      ["private-only", "mode", "freevpn-private-only"],
-      ["kill-switch", "killSwitch", "freevpn-kill-switch"],
-      ["auto-connect", "autoConnect", "freevpn-auto-connect"],
-    ]) {
+    const privateOnly = this.#el(
+      "moz-checkbox",
+      { id: "private-only", l10n: { id: "freevpn-private-only" } },
+      settings
+    );
+    privateOnly.addEventListener("change", () =>
+      Services.prefs.setStringPref(
+        PREF_BRANCH + "mode",
+        privateOnly.checked ? "private" : "all"
+      )
+    );
+    for (const [id, [pref]] of Object.entries(BOOL_PREFS)) {
       const checkbox = this.#el(
         "moz-checkbox",
-        { id, l10n: { id: l10nId } },
+        { id, l10n: { id: `freevpn-${id}` } },
         settings
       );
-      checkbox.addEventListener("change", () => {
-        if (pref == "mode") {
-          Services.prefs.setStringPref(
-            PREF_BRANCH + "mode",
-            checkbox.checked ? "private" : "all"
-          );
-        } else {
-          Services.prefs.setBoolPref(PREF_BRANCH + pref, checkbox.checked);
-        }
-      });
+      checkbox.addEventListener("change", () =>
+        Services.prefs.setBoolPref(PREF_BRANCH + pref, checkbox.checked)
+      );
     }
 
     this.#el(
@@ -233,40 +288,19 @@ class FreeVPNPanel {
     if (!this.#built) {
       return;
     }
-    const { FreeVPN, FreeVPNStates, FreeVPNProviders } = lazy;
+    const { FreeVPN, FreeVPNProviders } = lazy;
+    const FreeVPNStates = lazy.FreeVPNStates;
     const state = FreeVPN.state;
     const l10n = this.doc.l10n;
     const providerId = FreeVPN.provider;
 
     this.panelview.setAttribute("freevpn-state", state);
-    this.#get("status-icon").src = `${ICON_BASE}freevpn-${iconFor(state)}.svg`;
-
-    const toggle = this.#get("toggle");
-    toggle.pressed =
+    this.#get("status-icon").src = iconURL(state);
+    this.#get("toggle").pressed =
       state == FreeVPNStates.ON || state == FreeVPNStates.CONNECTING;
 
     l10n.setAttributes(this.#get("status-title"), `freevpn-status-${state}`);
-    const detail = this.#get("status-detail");
-    if (state == FreeVPNStates.CONNECTING) {
-      l10n.setAttributes(detail, "freevpn-detail-connecting", {
-        percent: FreeVPN.progress,
-      });
-    } else if (state == FreeVPNStates.ON && FreeVPN.exitInfo?.ip) {
-      l10n.setAttributes(detail, "freevpn-detail-on-ip", {
-        ip: FreeVPN.exitInfo.ip,
-      });
-    } else if (state == FreeVPNStates.ON) {
-      l10n.setAttributes(detail, "freevpn-detail-on");
-    } else if (state == FreeVPNStates.ERROR) {
-      l10n.setAttributes(
-        detail,
-        Services.prefs.getBoolPref(PREF_BRANCH + "killSwitch", true)
-          ? "freevpn-detail-error-blocked"
-          : "freevpn-detail-error"
-      );
-    } else {
-      l10n.setAttributes(detail, `freevpn-detail-off-${providerId}`);
-    }
+    this.#updateDetail(state, providerId);
 
     const progress = this.#get("progress");
     progress.hidden = state != FreeVPNStates.CONNECTING;
@@ -280,46 +314,85 @@ class FreeVPNPanel {
       });
     }
 
+    const site = currentSite(this.doc.ownerGlobal);
+    const siteBypass = this.#get("site-bypass");
+    siteBypass.hidden = !site;
+    if (site) {
+      l10n.setAttributes(siteBypass, "freevpn-site-bypass", { site });
+      siteBypass.checked = FreeVPN.isBypassed(site);
+    }
+
     this.#get("new-identity").hidden = !(
       state == FreeVPNStates.ON && FreeVPN.usesTor
     );
     this.#get("check-ip").hidden = state != FreeVPNStates.ON;
 
     this.#setIfIdle("provider", providerId);
-    this.#get("location").hidden = providerId != FreeVPNProviders.TOR;
-    this.#setIfIdle(
-      "location",
-      Services.prefs.getStringPref(PREF_BRANCH + "exitCountry", "")
-    );
+    const isManagedTor = providerId == FreeVPNProviders.TOR;
+    this.#get("location").hidden = !isManagedTor;
+    this.#get("bridges").hidden = !isManagedTor;
+    this.#setIfIdle("location", getString("exitCountry", ""));
+    this.#setIfIdle("bridges", getString("tor.bridgeType", "auto"));
 
     this.#get("custom").hidden = providerId != FreeVPNProviders.CUSTOM;
-    this.#setIfIdle(
-      "custom-type",
-      Services.prefs.getStringPref(PREF_BRANCH + "custom.type", "socks")
-    );
-    this.#setIfIdle(
-      "custom-host",
-      Services.prefs.getStringPref(PREF_BRANCH + "custom.host", "")
-    );
+    this.#setIfIdle("custom-type", getString("custom.type", "socks"));
+    this.#setIfIdle("custom-host", getString("custom.host", ""));
     this.#setIfIdle(
       "custom-port",
       String(Services.prefs.getIntPref(PREF_BRANCH + "custom.port", 1080))
     );
 
-    this.#get("private-only").checked =
-      Services.prefs.getStringPref(PREF_BRANCH + "mode", "all") == "private";
-    this.#get("kill-switch").checked = Services.prefs.getBoolPref(
-      PREF_BRANCH + "killSwitch",
-      true
-    );
-    this.#get("auto-connect").checked = Services.prefs.getBoolPref(
-      PREF_BRANCH + "autoConnect",
-      false
-    );
+    this.#get("private-only").checked = getString("mode", "all") == "private";
+    for (const [id, [pref, fallback]] of Object.entries(BOOL_PREFS)) {
+      this.#get(id).checked = Services.prefs.getBoolPref(
+        PREF_BRANCH + pref,
+        fallback
+      );
+    }
+  }
+
+  #updateDetail(state, providerId) {
+    const FreeVPN = lazy.FreeVPN;
+    const FreeVPNStates = lazy.FreeVPNStates;
+    const detail = this.#get("status-detail");
+    const l10n = this.doc.l10n;
+    switch (state) {
+      case FreeVPNStates.CONNECTING:
+        l10n.setAttributes(
+          detail,
+          FreeVPN.bridgeInUse == "none"
+            ? "freevpn-detail-connecting"
+            : "freevpn-detail-connecting-bridge",
+          { percent: FreeVPN.progress, bridge: FreeVPN.bridgeInUse }
+        );
+        break;
+      case FreeVPNStates.ON:
+        if (FreeVPN.exitInfo?.ip) {
+          l10n.setAttributes(detail, "freevpn-detail-on-ip", {
+            ip: FreeVPN.exitInfo.ip,
+          });
+        } else {
+          l10n.setAttributes(detail, "freevpn-detail-on");
+        }
+        break;
+      case FreeVPNStates.ERROR:
+        l10n.setAttributes(
+          detail,
+          Services.prefs.getBoolPref(PREF_BRANCH + "killSwitch", true)
+            ? "freevpn-detail-error-blocked"
+            : "freevpn-detail-error"
+        );
+        break;
+      default:
+        l10n.setAttributes(detail, `freevpn-detail-off-${providerId}`);
+    }
   }
 
   /**
    * Updates a form control unless it has focus, so typing is not clobbered.
+   *
+   * @param {string} id - Element key passed to #el.
+   * @param {string} value - The new value.
    */
   #setIfIdle(id, value) {
     const el = this.#get(id);
@@ -329,21 +402,9 @@ class FreeVPNPanel {
   }
 }
 
-function iconFor(state) {
-  switch (state) {
-    case lazy.FreeVPNStates.ON:
-      return "on";
-    case lazy.FreeVPNStates.CONNECTING:
-      return "connecting";
-    case lazy.FreeVPNStates.ERROR:
-      return "error";
-    default:
-      return "off";
-  }
-}
-
 /**
- * Owns the "Free VPN" toolbar button and its panel in every window.
+ * Owns the "Free VPN" toolbar button and its panel in every window. Clicking
+ * the button turns the VPN on or off; the arrow next to it opens the panel.
  */
 export const FreeVPNWidget = {
   WIDGET_ID,
@@ -359,9 +420,10 @@ export const FreeVPNWidget = {
     lazy.CustomizableUI.createWidget({
       id: WIDGET_ID,
       l10nId: "freevpn-button",
-      type: "view",
+      type: "button-and-view",
       viewId: PANEL_ID,
       disallowSubView: true,
+      onCommand: () => lazy.FreeVPN.toggle(),
       onViewShowing: event => this.onViewShowing(event),
       onCreated: node => this.updateButton(node),
     });
@@ -412,19 +474,23 @@ export const FreeVPNWidget = {
     panel.update();
   },
 
+  /**
+   * @param {Element} node - The widget's toolbaritem.
+   */
   updateButton(node) {
     const state = lazy.FreeVPN.state;
+    const doc = node.ownerDocument;
     node.setAttribute("freevpn-state", state);
-    node.style.listStyleImage = `url("${ICON_BASE}freevpn-${iconFor(state)}.svg")`;
-    const l10nId =
-      state == lazy.FreeVPNStates.ON
-        ? "freevpn-button-on"
-        : state == lazy.FreeVPNStates.CONNECTING
-          ? "freevpn-button-connecting"
-          : state == lazy.FreeVPNStates.ERROR
-            ? "freevpn-button-error"
-            : "freevpn-button";
-    node.ownerDocument.l10n.setAttributes(node, l10nId);
+    const button =
+      node.querySelector(`#${WIDGET_ID}-button`) ??
+      doc.getElementById(`${WIDGET_ID}-button`) ??
+      node;
+    button.style.listStyleImage = `url("${iconURL(state)}")`;
+    doc.l10n.setAttributes(button, BUTTON_L10N[state] ?? "freevpn-button");
+    const dropmarker = node.querySelector(`#${WIDGET_ID}-dropmarker`);
+    if (dropmarker) {
+      doc.l10n.setAttributes(dropmarker, "freevpn-dropmarker");
+    }
   },
 
   updateAll() {
