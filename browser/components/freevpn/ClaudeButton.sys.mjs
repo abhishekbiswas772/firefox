@@ -51,6 +51,9 @@ export const ClaudeButton = {
     for (const win of Services.wm.getEnumerator("navigator:browser")) {
       this._observers.get(win)?.disconnect();
       win.removeEventListener("SidebarShown", this);
+      win.document
+        .getElementById("sidebar-box")
+        ?.removeEventListener("sidebar-show", this);
     }
     this._observers = new WeakMap();
     lazy.CustomizableUI.destroyWidget(WIDGET_ID);
@@ -86,14 +89,34 @@ export const ClaudeButton = {
       this.updateButton(win);
       return;
     }
+    // The sidebar has no single "changed" event: listen to showing, to the
+    // box being hidden or shown, and to the revamped sidebar switching panels.
     win.addEventListener("SidebarShown", this);
     const box = win.document.getElementById("sidebar-box");
     if (box) {
-      const observer = new win.MutationObserver(() => this.updateButton(win));
-      observer.observe(box, { attributes: true, attributeFilter: ["hidden"] });
+      box.addEventListener("sidebar-show", this);
+      const observer = new win.MutationObserver(() => this.scheduleUpdate(win));
+      observer.observe(box, {
+        attributes: true,
+        attributeFilter: ["hidden", "checked"],
+      });
       this._observers.set(win, observer);
     }
     this.updateButton(win);
+  },
+
+  /**
+   * Updates the button once the sidebar has finished switching, since some
+   * signals arrive before SidebarController's state is updated.
+   *
+   * @param {Window} win
+   */
+  scheduleUpdate(win) {
+    win.setTimeout(() => {
+      if (!win.closed) {
+        this.updateButton(win);
+      }
+    }, 0);
   },
 
   updateButton(win) {
@@ -110,9 +133,8 @@ export const ClaudeButton = {
   },
 
   handleEvent(event) {
-    if (event.type == "SidebarShown") {
-      this.updateButton(event.currentTarget);
-    }
+    const win = event.currentTarget.ownerGlobal ?? event.currentTarget;
+    this.scheduleUpdate(win);
   },
 };
 

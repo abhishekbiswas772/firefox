@@ -90,6 +90,8 @@ jobs:
         if: always()
         run: |
           grep -hE "TEST_START|TEST_END|Ran [0-9]+ checks|Unexpected results|^ *FAIL" test-logs/*.log || true
+          echo "---- Details for failing Free VPN / ad blocker / Claude tests ----"
+          grep -hiE "freevpn|adblock|claude|JavaScript error|console\.error|TypeError|NS_ERROR" test-logs/mochitest.log | grep -v "TEST_START\|TEST_END" | head -300 || true
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -175,6 +177,8 @@ jobs:
         if: always()
         run: |
           grep -hE "TEST_START|TEST_END|Ran [0-9]+ checks|Unexpected results|^ *FAIL" test-logs/*.log || true
+          echo "---- Details for failing Free VPN / ad blocker / Claude tests ----"
+          grep -hiE "freevpn|adblock|claude|JavaScript error|console\.error|TypeError|NS_ERROR" test-logs/mochitest.log | grep -v "TEST_START\|TEST_END" | head -300 || true
 
       - uses: actions/upload-artifact@v4
         if: always()

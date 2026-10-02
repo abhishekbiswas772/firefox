@@ -52,6 +52,12 @@ add_setup(async function () {
 });
 
 add_task(async function test_widget_present() {
+  info(
+    `platform=${AppConstants.platform} enabled=${Services.prefs.getBoolPref(
+      "browser.freevpn.enabled",
+      false
+    )} supported=${FreeVPN.isSupportedPlatform} state=${FreeVPN.state}`
+  );
   is(FreeVPN.state, FreeVPNStates.OFF, "VPN starts off");
   const item = document.getElementById("freevpn-button");
   ok(item, "Toolbar item exists");
