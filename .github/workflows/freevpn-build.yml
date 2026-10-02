@@ -10,6 +10,7 @@ on:
       - "browser/locales/en-US/browser/freeVpn.ftl"
       - "browser/installer/package-manifest.in"
       - "browser/app/profile/firefox.js"
+      - "testing/profiles/unittest-required/user.js"
       - ".github/workflows/freevpn-build.yml"
 
 permissions:
@@ -58,7 +59,7 @@ jobs:
         run: ./mach xpcshell-test browser/components/freevpn/tests/xpcshell
 
       - name: Browser tests
-        run: xvfb-run -a ./mach mochitest browser/components/freevpn/tests/browser
+        run: xvfb-run -a ./mach mochitest browser/components/freevpn/tests/browser browser/components/genai/tests/browser
 
       - name: Bundle Tor and uBlock Origin
         env:
@@ -126,7 +127,7 @@ jobs:
       - name: Browser tests
         run: |
           export PATH="/c/mozilla-build/python3:/c/mozilla-build/bin:$PATH"
-          ./mach mochitest browser/components/freevpn/tests/browser
+          ./mach mochitest browser/components/freevpn/tests/browser browser/components/genai/tests/browser
 
       - name: Bundle Tor and uBlock Origin
         env:

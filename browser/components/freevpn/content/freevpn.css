@@ -68,6 +68,10 @@
   color: var(--text-color-deemphasized);
 }
 
+#claude-button {
+  list-style-image: url("chrome://browser/content/genai/assets/brands/claude.svg");
+}
+
 #adblock-button,
 #freevpn-button-button {
   -moz-context-properties: fill, fill-opacity;

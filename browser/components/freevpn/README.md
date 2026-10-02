@@ -9,6 +9,8 @@ Built-in privacy features for Firefox on **Linux and Windows**:
 - **Ad blocker**: one click turns [uBlock Origin](https://github.com/gorhill/uBlock)
   on or off. While on, Firefox's own sponsored tiles and suggestions are also
   turned off.
+- **Claude**: one click opens [claude.ai](https://claude.ai) in the sidebar,
+  next to the page you are reading.
 
 ## Choosing the VPN
 
@@ -86,6 +88,22 @@ engine used here. LibreWolf ships it the same way.
 - While ad blocking is on, sponsored new tab tiles and stories, sponsored
   address bar suggestions and VPN promos are off (only prefs you have not
   changed yourself are touched; they are restored when you turn it off).
+
+## Claude
+
+Firefox's AI chatbot sidebar (`browser/components/genai`) already hosts
+claude.ai with your normal claude.ai login, and can send the page or a
+selection to it ("Summarize page", "Explain this", and the selection
+shortcut). This build makes it one click away:
+
+- `ClaudeButton.sys.mjs` adds a **Claude** toolbar button that opens and closes
+  the chatbot sidebar; it is highlighted while Claude is open, however it was
+  opened (button, Ctrl+Alt+X, or the sidebar launcher).
+- Claude (`https://claude.ai/new`) is the default chatbot
+  (`browser.ml.chat.provider`); you can still pick another in the sidebar.
+- claude.ai, claude.com and anthropic.com are in the VPN's split tunneling
+  list by default, because Claude rejects or challenges many Tor exits and
+  login would otherwise fail while the VPN is on.
 
 ## Building (Linux and Windows only)
 

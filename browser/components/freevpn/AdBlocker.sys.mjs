@@ -25,7 +25,6 @@ const WIDGET_ID = "adblock-button";
 const PREF_BRANCH = "browser.adblock.";
 const ENABLED_PREF = PREF_BRANCH + "enabled";
 const FEATURE_PREF = PREF_BRANCH + "feature.enabled";
-const ADDED_PREF = PREF_BRANCH + "widgetAdded";
 const ICON_BASE = "chrome://browser/content/freevpn/";
 
 // Firefox's own paid placements, switched off while ad blocking is on.
@@ -259,22 +258,11 @@ class AdBlockerService extends EventTarget {
       id: WIDGET_ID,
       l10nId: "adblock-button-off",
       type: "button",
+      defaultArea: lazy.CustomizableUI.AREA_NAVBAR,
       onCommand: () => this.toggle(),
       onCreated: node => this.#updateButton(node),
     });
     this.#widgetCreated = true;
-    if (
-      !Services.prefs.getBoolPref(ADDED_PREF, false) &&
-      !lazy.CustomizableUI.getPlacementOfWidget(WIDGET_ID, false, true)
-    ) {
-      const vpn = lazy.CustomizableUI.getPlacementOfWidget("freevpn-button");
-      lazy.CustomizableUI.addWidgetToArea(
-        WIDGET_ID,
-        lazy.CustomizableUI.AREA_NAVBAR,
-        vpn ? vpn.position + 1 : null
-      );
-      Services.prefs.setBoolPref(ADDED_PREF, true);
-    }
   }
 
   #updateButton(node) {

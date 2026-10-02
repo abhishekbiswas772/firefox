@@ -16,7 +16,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
 const HTML_NS = "http://www.w3.org/1999/xhtml";
 const WIDGET_ID = "freevpn-button";
 const PANEL_ID = "PanelUI-freevpn";
-const ADDED_PREF = "browser.freevpn.widgetAdded";
 const PREF_BRANCH = "browser.freevpn.";
 const TOR_CHECK_PAGE = "https://check.torproject.org/";
 const ICON_BASE = "chrome://browser/content/freevpn/";
@@ -423,12 +422,12 @@ export const FreeVPNWidget = {
       type: "button-and-view",
       viewId: PANEL_ID,
       disallowSubView: true,
+      defaultArea: lazy.CustomizableUI.AREA_NAVBAR,
       onCommand: () => lazy.FreeVPN.toggle(),
       onViewShowing: event => this.onViewShowing(event),
       onCreated: node => this.updateButton(node),
     });
     this.created = true;
-    this.placeWidget();
     lazy.FreeVPN.addEventListener("FreeVPN:StateChanged", this);
     Services.prefs.addObserver(PREF_BRANCH, this);
   },
@@ -442,24 +441,6 @@ export const FreeVPNWidget = {
     lazy.CustomizableUI.destroyWidget(WIDGET_ID);
     this.panels = new WeakMap();
     this.created = false;
-  },
-
-  placeWidget() {
-    if (
-      Services.prefs.getBoolPref(ADDED_PREF, false) ||
-      lazy.CustomizableUI.getPlacementOfWidget(WIDGET_ID, false, true)
-    ) {
-      return;
-    }
-    const fxa = lazy.CustomizableUI.getPlacementOfWidget(
-      "fxa-toolbar-menu-button"
-    );
-    lazy.CustomizableUI.addWidgetToArea(
-      WIDGET_ID,
-      lazy.CustomizableUI.AREA_NAVBAR,
-      fxa ? fxa.position : null
-    );
-    Services.prefs.setBoolPref(ADDED_PREF, true);
   },
 
   onViewShowing(event) {

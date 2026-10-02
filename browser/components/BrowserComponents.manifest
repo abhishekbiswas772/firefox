@@ -189,6 +189,7 @@ category browser-first-window-ready moz-src:///browser/components/ipprotection/I
 #if defined(XP_LINUX) || defined(XP_WIN)
 category browser-first-window-ready moz-src:///browser/components/freevpn/FreeVPN.sys.mjs FreeVPNStartup.init
 category browser-first-window-ready moz-src:///browser/components/freevpn/AdBlocker.sys.mjs AdBlockerStartup.init
+category browser-first-window-ready moz-src:///browser/components/freevpn/ClaudeButton.sys.mjs ClaudeButtonStartup.init
 #endif
 category browser-first-window-ready moz-src:///browser/components/customizableui/SearchWidgetTracker.sys.mjs SearchWidgetTracker.init
 #ifdef MOZ_SANDBOX
@@ -252,6 +253,7 @@ category browser-quit-application-granted moz-src:///browser/components/ipprotec
 #if defined(XP_LINUX) || defined(XP_WIN)
 category browser-quit-application-granted moz-src:///browser/components/freevpn/FreeVPN.sys.mjs FreeVPNStartup.uninit
 category browser-quit-application-granted moz-src:///browser/components/freevpn/AdBlocker.sys.mjs AdBlockerStartup.uninit
+category browser-quit-application-granted moz-src:///browser/components/freevpn/ClaudeButton.sys.mjs ClaudeButtonStartup.uninit
 #endif
 
 category search-service-notification moz-src:///browser/components/search/SearchUIUtils.sys.mjs SearchUIUtils.showSearchServiceNotification

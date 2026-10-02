@@ -149,3 +149,12 @@ adblock-button-busy =
 adblock-button-error =
     .label = Ad blocker
     .tooltiptext = The ad blocker could not be installed. Check your connection and click to try again.
+
+## Claude toolbar button. "Claude" is a product name and is not translated.
+
+claude-button =
+    .label = Claude
+    .tooltiptext = Open Claude in the sidebar
+claude-button-open =
+    .label = Claude
+    .tooltiptext = Close Claude

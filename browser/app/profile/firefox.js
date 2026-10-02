@@ -2387,7 +2387,12 @@ pref("browser.ml.chat.prompts.0", '{"id":"summarize","l10nId":"genai-prompts-sum
 pref("browser.ml.chat.prompts.1", '{"id":"explain","l10nId":"genai-prompts-explain","targeting":"contentType != \'page\'"}');
 pref("browser.ml.chat.prompts.3", '{"id":"quiz","l10nId":"genai-prompts-quiz","targeting":"(!provider|regExpMatch(\'gemini\') || region == \'US\') && contentType != \'page\'"}');
 pref("browser.ml.chat.prompts.4", '{"id":"proofread", "l10nId":"genai-prompts-proofread","targeting":"contentType != \'page\'"}');
+#if defined(XP_LINUX) || defined(XP_WIN)
+// Claude is the default AI chatbot; see browser/components/freevpn/ClaudeButton.sys.mjs.
+pref("browser.ml.chat.provider", "https://claude.ai/new");
+#else
 pref("browser.ml.chat.provider", "");
+#endif
 pref("browser.ml.chat.shortcuts", true);
 pref("browser.ml.chat.shortcuts.custom", true);
 pref("browser.ml.chat.shortcuts.smartwindow", true);
@@ -3847,7 +3852,6 @@ pref("browser.freevpn.killSwitch", true);
 // Reconnect on startup if the VPN was on when the browser closed.
 pref("browser.freevpn.autoConnect", false);
 pref("browser.freevpn.wasConnected", false);
-pref("browser.freevpn.widgetAdded", false);
 // Path to a tor binary; empty to search the bundled copy, common locations and PATH.
 pref("browser.freevpn.tor.binaryPath", "");
 // Bridge lines (one per line) for networks that block Tor, e.g. obfs4 or webtunnel.
@@ -3860,7 +3864,7 @@ pref("browser.freevpn.tor.lastWorkingBridgeType", "none");
 pref("browser.freevpn.batterySaver", true);
 // Split tunneling: sites that skip the VPN, including everything they load.
 // Video and audio calls need UDP, which cannot go through Tor.
-pref("browser.freevpn.bypassDomains", "meet.google.com,zoom.us,zoom.com,teams.microsoft.com,teams.live.com,teams.cloud.microsoft,whereby.com,meet.jit.si,8x8.vc,discord.com,web.whatsapp.com,web.telegram.org,app.slack.com,webex.com,messenger.com");
+pref("browser.freevpn.bypassDomains", "meet.google.com,zoom.us,zoom.com,teams.microsoft.com,teams.live.com,teams.cloud.microsoft,whereby.com,meet.jit.si,8x8.vc,discord.com,web.whatsapp.com,web.telegram.org,app.slack.com,webex.com,messenger.com,claude.ai,claude.com,anthropic.com");
 pref("browser.freevpn.system.port", 9050);
 pref("browser.freevpn.custom.type", "socks");
 pref("browser.freevpn.custom.host", "");
@@ -3878,7 +3882,13 @@ pref("browser.adblock.feature.enabled", true);
 pref("browser.adblock.feature.enabled", false);
 #endif
 pref("browser.adblock.enabled", true);
-pref("browser.adblock.widgetAdded", false);
+
+// One-click toolbar button that opens Claude in the AI chatbot sidebar.
+#if defined(XP_LINUX) || defined(XP_WIN)
+pref("browser.claude.button.enabled", true);
+#else
+pref("browser.claude.button.enabled", false);
+#endif
 
 // Pref to enable aboug:glean redesign.
 pref("about.glean.redesign.enabled", false);
