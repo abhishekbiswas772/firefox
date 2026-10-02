@@ -99,8 +99,9 @@ shortcut). This build makes it one click away:
 - `ClaudeButton.sys.mjs` adds a **Claude** toolbar button that opens and closes
   the chatbot sidebar; it is highlighted while Claude is open, however it was
   opened (button, Ctrl+Alt+X, or the sidebar launcher).
-- Claude (`https://claude.ai/new`) is the default chatbot
-  (`browser.ml.chat.provider`); you can still pick another in the sidebar.
+- The first click chooses Claude (`https://claude.ai/new`) as the chatbot
+  (`browser.ml.chat.provider`) if none was chosen yet; a different choice
+  made in the sidebar is kept.
 - claude.ai, claude.com and anthropic.com are in the VPN's split tunneling
   list by default, because Claude rejects or challenges many Tor exits and
   login would otherwise fail while the VPN is on.

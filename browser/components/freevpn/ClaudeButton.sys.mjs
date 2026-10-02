@@ -19,8 +19,9 @@ const CHAT_ENABLED_PREF = "browser.ml.chat.enabled";
 /**
  * A one-click toolbar button that opens Claude (claude.ai) in Firefox's AI
  * chatbot sidebar, next to the page. The sidebar, its "summarize page" and
- * selection prompts, and the Ctrl+Alt+X shortcut are Firefox's own; this
- * makes Claude the provider and puts it one click away.
+ * selection prompts, and the Ctrl+Alt+X shortcut are Firefox's own. The first
+ * click chooses Claude as the chatbot if none was chosen yet; a different
+ * choice made in the sidebar is kept.
  */
 export const ClaudeButton = {
   _inited: false,
@@ -37,7 +38,7 @@ export const ClaudeButton = {
       l10nId: "claude-button",
       type: "button",
       defaultArea: lazy.CustomizableUI.AREA_NAVBAR,
-      onCommand: event => this.toggle(event.target.ownerGlobal),
+      onCommand: event => this.toggle(event.view),
       onCreated: node => this.trackWindow(node.ownerGlobal),
     });
   },

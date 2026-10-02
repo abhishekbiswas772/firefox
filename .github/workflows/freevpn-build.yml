@@ -57,10 +57,14 @@ jobs:
         run: ./mach lint -l eslint -l fluent-lint -l stylelint browser/components/freevpn browser/locales/en-US/browser/freeVpn.ftl
 
       - name: xpcshell tests
-        run: ./mach xpcshell-test browser/components/freevpn/tests/xpcshell
+        run: |
+          mkdir -p test-logs
+          ./mach xpcshell-test browser/components/freevpn/tests/xpcshell 2>&1 | tee test-logs/xpcshell.log
 
       - name: Browser tests
-        run: xvfb-run -a ./mach mochitest browser/components/freevpn/tests/browser browser/components/genai/tests/browser
+        run: |
+          mkdir -p test-logs
+          xvfb-run -a ./mach mochitest browser/components/freevpn/tests/browser browser/components/genai/tests/browser 2>&1 | tee test-logs/mochitest.log
 
       - name: Bundle Tor and uBlock Origin
         env:
@@ -81,6 +85,17 @@ jobs:
         with:
           name: firefox-freevpn-linux-x86_64
           path: out/*
+
+      - name: Test summary
+        if: always()
+        run: |
+          grep -hE "TEST_START|TEST_END|Ran [0-9]+ checks|Unexpected results|^ *FAIL" test-logs/*.log || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-logs-linux
+          path: test-logs/
 
   windows:
     runs-on: windows-latest
@@ -123,12 +138,14 @@ jobs:
       - name: xpcshell tests
         run: |
           export PATH="/c/mozilla-build/python3:/c/mozilla-build/bin:$PATH"
-          ./mach xpcshell-test browser/components/freevpn/tests/xpcshell
+          mkdir -p test-logs
+          ./mach xpcshell-test browser/components/freevpn/tests/xpcshell 2>&1 | tee test-logs/xpcshell.log
 
       - name: Browser tests
         run: |
           export PATH="/c/mozilla-build/python3:/c/mozilla-build/bin:$PATH"
-          ./mach mochitest browser/components/freevpn/tests/browser browser/components/genai/tests/browser
+          mkdir -p test-logs
+          ./mach mochitest browser/components/freevpn/tests/browser browser/components/genai/tests/browser 2>&1 | tee test-logs/mochitest.log
 
       - name: Bundle Tor and uBlock Origin
         env:
@@ -153,4 +170,15 @@ jobs:
         with:
           name: firefox-freevpn-windows-x86_64
           path: out/*
+
+      - name: Test summary
+        if: always()
+        run: |
+          grep -hE "TEST_START|TEST_END|Ran [0-9]+ checks|Unexpected results|^ *FAIL" test-logs/*.log || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-logs-windows
+          path: test-logs/
 

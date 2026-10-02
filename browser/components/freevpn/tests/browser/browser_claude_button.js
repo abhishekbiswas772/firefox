@@ -19,29 +19,30 @@ function isChatOpen() {
   );
 }
 
+async function hideSidebar() {
+  if (SidebarController.isOpen) {
+    await SidebarController.hide();
+  }
+}
+
 add_setup(async function () {
+  // Must be off before the provider changes, or the change opens the sidebar.
+  await SpecialPowers.pushPrefEnv({
+    set: [["browser.ml.chat.openSidebarOnProviderChange", false]],
+  });
   await SpecialPowers.pushPrefEnv({
     set: [
       ["browser.ml.chat.enabled", true],
       ["browser.ml.chat.provider", TEST_PROVIDER],
       ["browser.ml.chat.page", false],
-      ["browser.ml.chat.openSidebarOnProviderChange", false],
     ],
   });
-  registerCleanupFunction(async () => {
-    if (SidebarController.isOpen) {
-      await SidebarController.hide();
-    }
-  });
+  await hideSidebar();
+  registerCleanupFunction(hideSidebar);
 });
 
 add_task(function test_defaults() {
   const defaults = Services.prefs.getDefaultBranch("");
-  is(
-    defaults.getStringPref("browser.ml.chat.provider"),
-    CLAUDE_URL,
-    "Claude is the default AI chatbot"
-  );
   const bypass = defaults
     .getStringPref("browser.freevpn.bypassDomains")
     .split(",");
@@ -95,6 +96,8 @@ add_task(async function test_button_tracks_shortcut_and_other_sidebars() {
 });
 
 add_task(async function test_unset_provider_becomes_claude() {
+  // An open chatbot sidebar would load the new provider, which tests cannot.
+  await hideSidebar();
   await SpecialPowers.pushPrefEnv({
     set: [["browser.ml.chat.provider", ""]],
   });
@@ -108,6 +111,16 @@ add_task(async function test_unset_provider_becomes_claude() {
       "Claude is chosen when no chatbot was picked"
     );
     is(toggle.firstCall.args[0], CHAT_SIDEBAR_ID, "Toggles the chatbot");
+
+    toggle.resetHistory();
+    Services.prefs.setStringPref("browser.ml.chat.provider", TEST_PROVIDER);
+    document.getElementById("claude-button").click();
+    await TestUtils.waitForCondition(() => toggle.called, "Toggled again");
+    is(
+      Services.prefs.getStringPref("browser.ml.chat.provider"),
+      TEST_PROVIDER,
+      "A chatbot the user chose is kept"
+    );
   } finally {
     toggle.restore();
   }
