@@ -1,109 +1,128 @@
-# Free VPN
+# Free VPN and ad blocker
 
-A built-in, free, no-account VPN for Firefox on **Linux and Windows**. It sends
-browser traffic through the [Tor network](https://www.torproject.org/) by
-default, using a Tor process the browser starts and stops itself. It needs no
-admin rights, no sign-up and no paid servers.
+Built-in privacy features for Firefox on **Linux and Windows**:
 
-## Why Tor
+- **Free VPN**: browser traffic goes through the
+  [Tor network](https://www.torproject.org/), using a Tor process the browser
+  starts and stops itself. One click turns it on or off. No account, no paid
+  servers, no admin rights. Only the browser is tunneled.
+- **Ad blocker**: one click turns [uBlock Origin](https://github.com/gorhill/uBlock)
+  on or off. While on, Firefox's own sponsored tiles and suggestions are also
+  turned off.
 
-The free, open source options compared:
+## Choosing the VPN
 
-| Option | Free | Open source | No account | Works without admin rights | Notes |
+| Option | Free, no paid tier | Open source | No account | Many countries | Works in the browser without admin rights |
 | --- | --- | --- | --- | --- | --- |
-| **Tor** | Yes | Yes (BSD) | Yes | Yes (local SOCKS5 proxy) | Thousands of volunteer relays, exit country can be chosen, bridges get past censorship. Slower than a commercial VPN; some sites block it. |
-| RiseupVPN / CalyxVPN | Yes | Yes (GPL) | Yes | No | OpenVPN-based system VPN. Needs a TUN device, so admin rights and a helper service. Few locations. |
-| Psiphon | Yes | Yes (GPL) | Yes | Yes | Needs Psiphon-issued network config values to run the open source client. |
-| Proton VPN free | Yes | Clients only | No | No | Requires an account; servers are not open source. |
+| **Tor** | Yes | Yes (BSD) | Yes | Yes (exit country can be picked) | Yes (local SOCKS5 proxy) |
+| VPN Gate (Univ. of Tsukuba) | Yes | Client yes (SoftEther) | Yes | Yes | No: OpenVPN/L2TP/SSTP need a system VPN adapter |
+| RiseupVPN / CalyxVPN | Yes (donations) | Yes (GPL) | Yes | Few | No: OpenVPN needs a system VPN adapter |
+| Psiphon | Yes | Yes (GPL) | Yes | Yes | Needs network config values issued by Psiphon |
+| Lantern, Proton VPN free, Cloudflare WARP | Free tier of a paid product | Partly | Varies | Limited | Varies |
 
-Tor is the only option that is fully free, fully open source, needs no
-account, and runs as an unprivileged local proxy on both Linux and Windows, so
-it is the default. Any of the others can still be used through the
-**Custom proxy** setting if they expose a local SOCKS5 or HTTP proxy.
+Tor is the only option that is fully free with no paid tier, fully open source,
+needs no account, offers many countries, and runs as an unprivileged local
+proxy on both Linux and Windows. Its trade-off is speed: Tor is slower than a
+commercial VPN and some sites block or challenge Tor exits. Nothing that is
+free, unlimited and multi-country is also as fast as a paid VPN, because
+someone has to pay for the bandwidth. Any other service that exposes a local
+SOCKS5 or HTTP proxy can be used with the **Custom proxy** setting.
 
-## How it works
+## VPN features
 
-- `FreeVPNTorLauncher.sys.mjs` finds a `tor` binary, writes a `torrc` into
-  `<profile>/freevpn/tor`, starts Tor with a random local SOCKS port and waits
-  for it to bootstrap. Tor is told to exit when the browser exits
-  (`__OwningControllerProcess`), even after a crash.
-- `FreeVPNChannelFilter.sys.mjs` is an `nsIProtocolProxyChannelFilter` that
-  sends every channel (or only private-window channels) to the tunnel. DNS is
-  resolved by the proxy, so lookups do not leak. Localhost is never tunneled.
-- **Kill switch** (on by default): while connecting, requests wait; if Tor
-  fails or stops, requests are blocked instead of using the real connection.
-- **New identity** changes the SOCKS credentials, which makes Tor
-  (`IsolateSOCKSAuth`) build fresh circuits with a new exit IP.
-- While connected, WebRTC is restricted to the proxy and DNS prefetching and
-  speculative connections are turned off. These are set on the default pref
-  branch, so they are undone on disconnect and never saved.
-- `FreeVPNWidget.sys.mjs` adds a toolbar button whose panel has the on/off
-  switch, status and exit IP, location (exit country), provider and options.
+- **One-click toggle**: the toolbar button turns the VPN on or off; the arrow
+  next to it opens the settings panel.
+- **Kill switch** (on by default): while connecting, requests wait; if the
+  tunnel fails, requests are blocked instead of using the real connection.
+- **Split tunneling**: sites in `browser.freevpn.bypassDomains`, and everything
+  they load, use the normal connection. The panel can add the current site.
+  Common video and audio call sites are in the default list.
+- **Calls**: WebRTC is only forced through the proxy for pages that were loaded
+  through it, so calls on split-tunneled sites work normally, and other sites
+  cannot see your real IP through WebRTC. (Calls cannot run over Tor itself:
+  Tor carries TCP only.)
+- **Locations**: pick the exit country, or leave it automatic (fastest).
+- **New identity**: new Tor circuits and exit IP for new connections.
+- **Bad or censored networks**: the "Automatic" bridge setting tries a direct
+  connection, then the built-in Snowflake, obfs4 and meek bridges that ship
+  with the Tor Expert Bundle, and remembers what worked. A stalled bootstrap
+  (no progress for 60 s) moves on to the next option.
+- **Reconnects** when the network comes back, after waking from sleep, and if
+  Tor exits unexpectedly.
+- **Battery saver** (on by default): Tor goes dormant when idle and sends less
+  padding. Tor is stopped entirely when the VPN is off.
+- **Leak protection** while connected: DNS is resolved by the proxy, DNS
+  prefetching and speculative connections are off. These prefs are set on the
+  default branch, so they are never saved and are undone on disconnect.
 
-## Providers
+### Providers
 
 | `browser.freevpn.provider` | What it uses |
 | --- | --- |
 | `tor` (default) | A Tor process started by the browser. |
-| `tor-system` | A Tor already running on this computer (`browser.freevpn.system.port`, default 9050; use 9150 for a running Tor Browser). |
+| `tor-system` | A Tor already running on this computer (`browser.freevpn.system.port`, default 9050; 9150 for Tor Browser). |
 | `custom` | Any SOCKS5 / HTTP / HTTPS proxy (`browser.freevpn.custom.*`). |
 
 Tor is looked up in this order: `browser.freevpn.tor.binaryPath`, the copy
-bundled next to the browser (`freevpn-tor/tor/tor[.exe]`), common install
+bundled with the browser (`freevpn-tor/tor/tor[.exe]`), common install
 locations (`/usr/bin/tor`; `%ProgramFiles%\Tor`, Tor Browser on the Desktop),
-then `PATH`. On Linux, `sudo apt install tor` (or your distribution's
-equivalent) is enough.
+then `PATH`.
 
-For networks that block Tor, put bridge lines (from
-<https://bridges.torproject.org/>) in `browser.freevpn.tor.bridges`, one per
-line. obfs4 and webtunnel bridges use the `lyrebird` transport shipped with the
-Tor Expert Bundle.
+## Ad blocker
+
+[Brave](https://github.com/brave/adblock-rust) blocks ads with adblock-rust,
+which Firefox also vendors (`toolkit/components/content-classifier/etp_engine`)
+but only for Mozilla's tracker lists and without cosmetic filtering; adding ad
+lists there needs C++ changes. uBlock Origin uses the same filter lists
+(EasyList, EasyPrivacy, uBlock filters), adds cosmetic filtering and
+scriptlets, is GPLv3 and has no paid "acceptable ads" programme, so it is the
+engine used here. LibreWolf ships it the same way.
+
+- The Mozilla-signed uBlock Origin XPI is bundled in
+  `distribution/extensions/` and installed on first run. Without the bundled
+  copy it is installed from addons.mozilla.org the first time the toggle is
+  turned on.
+- It is allowed in private windows.
+- While ad blocking is on, sponsored new tab tiles and stories, sponsored
+  address bar suggestions and VPN promos are off (only prefs you have not
+  changed yourself are touched; they are restored when you turn it off).
 
 ## Building (Linux and Windows only)
 
-The feature is compiled in only when `OS_ARCH` is `Linux` or `WINNT`, and
-`browser.freevpn.enabled` defaults to `true` only there.
-
-Linux:
+The features are compiled in only when `OS_ARCH` is `Linux` or `WINNT`.
 
 ```sh
+# Linux (Windows: use build/mozconfig.win64 from a MozillaBuild shell,
+# and --platform windows-x86_64)
 export MOZCONFIG=$PWD/browser/components/freevpn/build/mozconfig.linux64
 ./mach build
 python3 browser/components/freevpn/tools/fetch_tor.py \
     --platform linux-x86_64 --dest obj-freevpn-linux64/dist/bin
-./mach run
+python3 browser/components/freevpn/tools/fetch_ublock.py \
+    --dest obj-freevpn-linux64/dist/bin
+./mach run          # or ./mach package
 ```
 
-Windows (from a MozillaBuild shell):
+The mozconfigs use artifact builds (prebuilt C++/Rust from Mozilla's Nightly),
+which is enough because these features are front-end code.
+`fetch_tor.py` checks the Tor Expert Bundle against Tor's published SHA-256
+list; `fetch_ublock.py` checks the add-on id and Mozilla signature files, and
+Firefox verifies the signature on install.
 
-```sh
-export MOZCONFIG=$PWD/browser/components/freevpn/build/mozconfig.win64
-./mach build
-python3 browser/components/freevpn/tools/fetch_tor.py \
-    --platform windows-x86_64 --dest obj-freevpn-win64/dist/bin
-./mach run
-```
-
-The mozconfigs use artifact builds (prebuilt C++/Rust from Mozilla CI), which
-is enough because Free VPN is front-end code. `fetch_tor.py` downloads the Tor
-Expert Bundle from dist.torproject.org and checks its SHA-256 against the
-published checksum list.
-
-`.github/workflows/freevpn-build.yml` builds, lints, tests and packages both
-platforms with Tor bundled, and uploads the archives as workflow artifacts.
+`.github/workflows/freevpn-build.yml` lints, tests, bundles and packages both
+platforms and uploads the Linux tarball and the Windows zip and installer as
+workflow artifacts.
 
 ## Tests
 
 ```sh
 ./mach xpcshell-test browser/components/freevpn/tests/xpcshell
+./mach mochitest browser/components/freevpn/tests/browser
 ```
 
-## Limitations and next steps
+## Limitations
 
-- Only browser traffic is tunneled; other applications are not affected.
-- UDP (WebRTC media, HTTP/3) cannot go through Tor; WebRTC is limited to the
-  proxy while connected.
-- Some websites block or add CAPTCHAs for Tor exit IPs.
+- Only browser traffic is tunneled.
+- Tor is slower than a paid VPN; some sites block or challenge Tor exits.
 - The custom proxy password is stored as a plain pref.
-- Possible next steps: Snowflake bridges, a settings page in about:preferences,
-  per-site exceptions, and an optional system-wide mode using RiseupVPN.
+- Builds are Nightly-based artifact builds, not Mozilla-branded release builds.
