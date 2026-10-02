@@ -1,0 +1,11 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Placeholders so the package always has these directories. Release builds
+# fill them with tools/fetch_tor.py and tools/fetch_ublock.py before
+# |mach package|.
+FINAL_TARGET = "dist/bin"
+
+FINAL_TARGET_FILES["freevpn-tor"] += ["README.txt"]
+FINAL_TARGET_FILES.distribution.extensions += ["README.txt"]

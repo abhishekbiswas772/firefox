@@ -5,14 +5,19 @@
 with Files("**"):
     BUG_COMPONENT = ("Firefox", "General")
 
+DIRS += ["bundle"]
+
 JAR_MANIFESTS += ["jar.mn"]
 
 MOZ_SRC_FILES += [
+    "AdBlocker.sys.mjs",
     "FreeVPN.sys.mjs",
     "FreeVPNChannelFilter.sys.mjs",
     "FreeVPNTorLauncher.sys.mjs",
     "FreeVPNWidget.sys.mjs",
 ]
+
+BROWSER_CHROME_MANIFESTS += ["tests/browser/browser.toml"]
 
 XPCSHELL_TESTS_MANIFESTS += ["tests/xpcshell/xpcshell.toml"]
 

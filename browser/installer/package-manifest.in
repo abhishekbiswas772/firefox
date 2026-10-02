@@ -467,3 +467,9 @@ bin/libfreebl_64int_3.so
 #if defined(BUILT_BY_MOZILLA)
 @RESPATH@/distribution/*
 #endif
+
+; Free VPN's Tor and the built-in ad blocker (browser/components/freevpn).
+#if defined(XP_LINUX) || defined(XP_WIN)
+@BINPATH@/freevpn-tor
+@BINPATH@/distribution/extensions
+#endif

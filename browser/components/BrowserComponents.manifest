@@ -188,6 +188,7 @@ category browser-first-window-ready moz-src:///toolkit/components/captchadetecti
 category browser-first-window-ready moz-src:///browser/components/ipprotection/IPProtectionHelpers.sys.mjs IPProtectionActivator.init
 #if defined(XP_LINUX) || defined(XP_WIN)
 category browser-first-window-ready moz-src:///browser/components/freevpn/FreeVPN.sys.mjs FreeVPNStartup.init
+category browser-first-window-ready moz-src:///browser/components/freevpn/AdBlocker.sys.mjs AdBlockerStartup.init
 #endif
 category browser-first-window-ready moz-src:///browser/components/customizableui/SearchWidgetTracker.sys.mjs SearchWidgetTracker.init
 #ifdef MOZ_SANDBOX
@@ -250,6 +251,7 @@ category browser-quit-application-granted moz-src:///browser/components/urlbar/U
 category browser-quit-application-granted moz-src:///browser/components/ipprotection/IPProtectionHelpers.sys.mjs IPProtectionActivator.uninit
 #if defined(XP_LINUX) || defined(XP_WIN)
 category browser-quit-application-granted moz-src:///browser/components/freevpn/FreeVPN.sys.mjs FreeVPNStartup.uninit
+category browser-quit-application-granted moz-src:///browser/components/freevpn/AdBlocker.sys.mjs AdBlockerStartup.uninit
 #endif
 
 category search-service-notification moz-src:///browser/components/search/SearchUIUtils.sys.mjs SearchUIUtils.showSearchServiceNotification

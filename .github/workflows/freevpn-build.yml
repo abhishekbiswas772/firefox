@@ -8,13 +8,15 @@ on:
     paths:
       - "browser/components/freevpn/**"
       - "browser/locales/en-US/browser/freeVpn.ftl"
+      - "browser/installer/package-manifest.in"
+      - "browser/app/profile/firefox.js"
       - ".github/workflows/freevpn-build.yml"
 
 permissions:
   contents: read
 
 concurrency:
-  group: freevpn-${{ github.ref }}
+  group: freevpn-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 env:
@@ -40,28 +42,43 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install test dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Bootstrap
         run: ./mach --no-interactive bootstrap --application-choice "Firefox for Desktop Artifact Mode"
 
       - name: Build
         run: ./mach build
 
-      - name: Lint Free VPN
-        run: ./mach lint -l eslint -l fluent-lint browser/components/freevpn browser/locales/en-US/browser/freeVpn.ftl
+      - name: Lint
+        run: ./mach lint -l eslint -l fluent-lint -l stylelint browser/components/freevpn browser/locales/en-US/browser/freeVpn.ftl
 
       - name: xpcshell tests
         run: ./mach xpcshell-test browser/components/freevpn/tests/xpcshell
 
-      - name: Package with bundled Tor
+      - name: Browser tests
+        run: xvfb-run -a ./mach mochitest browser/components/freevpn/tests/browser
+
+      - name: Bundle Tor and uBlock Origin
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 browser/components/freevpn/tools/fetch_tor.py --platform linux-x86_64 --dest "$OBJDIR/dist/bin"
+          python3 browser/components/freevpn/tools/fetch_ublock.py --dest "$OBJDIR/dist/bin"
+
+      - name: Package
         run: |
           ./mach package
-          python3 browser/components/freevpn/tools/fetch_tor.py --platform linux-x86_64 --dest "$OBJDIR/dist/firefox"
-          tar -C "$OBJDIR/dist" -cJf firefox-freevpn-linux-x86_64.tar.xz firefox
+          mkdir -p out
+          cp "$OBJDIR"/dist/firefox-*.tar.* out/
+          (cd out && for f in firefox-*.tar.*; do mv "$f" "firefox-freevpn-linux-x86_64.tar.${f##*.tar.}"; done && sha256sum * > SHA256SUMS-linux.txt)
+          ls -l out
 
       - uses: actions/upload-artifact@v4
         with:
           name: firefox-freevpn-linux-x86_64
-          path: firefox-freevpn-linux-x86_64.tar.xz
+          path: out/*
 
   windows:
     runs-on: windows-latest
@@ -106,14 +123,32 @@ jobs:
           export PATH="/c/mozilla-build/python3:/c/mozilla-build/bin:$PATH"
           ./mach xpcshell-test browser/components/freevpn/tests/xpcshell
 
-      - name: Package with bundled Tor
+      - name: Browser tests
+        run: |
+          export PATH="/c/mozilla-build/python3:/c/mozilla-build/bin:$PATH"
+          ./mach mochitest browser/components/freevpn/tests/browser
+
+      - name: Bundle Tor and uBlock Origin
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          export PATH="/c/mozilla-build/python3:/c/mozilla-build/bin:$PATH"
+          python3 browser/components/freevpn/tools/fetch_tor.py --platform windows-x86_64 --dest "$OBJDIR/dist/bin"
+          python3 browser/components/freevpn/tools/fetch_ublock.py --dest "$OBJDIR/dist/bin"
+
+      - name: Package
         run: |
           export PATH="/c/mozilla-build/python3:/c/mozilla-build/bin:$PATH"
           ./mach package
-          python3 browser/components/freevpn/tools/fetch_tor.py --platform windows-x86_64 --dest "$OBJDIR/dist/firefox"
-          python3 -c "import shutil; shutil.make_archive('firefox-freevpn-windows-x86_64', 'zip', '$OBJDIR/dist', 'firefox')"
+          mkdir -p out
+          cp "$OBJDIR"/dist/firefox-*.win64.zip out/firefox-freevpn-windows-x86_64.zip
+          cp "$OBJDIR"/dist/install/sea/firefox-*.win64.installer.exe out/firefox-freevpn-windows-x86_64-setup.exe 2>/dev/null \
+            || cp "$OBJDIR"/dist/firefox-*.win64.installer.exe out/firefox-freevpn-windows-x86_64-setup.exe
+          (cd out && sha256sum * > SHA256SUMS-windows.txt)
+          ls -l out
 
       - uses: actions/upload-artifact@v4
         with:
           name: firefox-freevpn-windows-x86_64
-          path: firefox-freevpn-windows-x86_64.zip
+          path: out/*
+

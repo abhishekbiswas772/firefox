@@ -18,8 +18,8 @@
 }
 
 #freevpn-status-icon {
-  width: 32px;
-  height: 32px;
+  width: var(--size-item-large);
+  height: var(--size-item-large);
   -moz-context-properties: fill, fill-opacity;
   fill: currentColor;
 }
@@ -68,6 +68,7 @@
   color: var(--text-color-deemphasized);
 }
 
+#adblock-button,
 #freevpn-button-button {
   -moz-context-properties: fill, fill-opacity;
 }

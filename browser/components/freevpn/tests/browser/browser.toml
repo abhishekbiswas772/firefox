@@ -1,0 +1,10 @@
+[DEFAULT]
+run-if = [
+  "os == 'linux'",
+  "os == 'win'",
+]
+support-files = ["check_ip.json"]
+
+["browser_adblock_toggle.js"]
+
+["browser_freevpn_toggle.js"]

@@ -134,3 +134,18 @@ freevpn-auto-connect =
     .label = Reconnect when { -brand-short-name } starts
 
 freevpn-footer = Tor is free and open source software run by volunteers. Some websites block or slow down Tor connections.
+
+## Built-in ad blocker toolbar button.
+
+adblock-button-on =
+    .label = Ad blocker
+    .tooltiptext = Ads and trackers are blocked. Click to allow ads.
+adblock-button-off =
+    .label = Ad blocker
+    .tooltiptext = Ads are allowed. Click to block ads and trackers.
+adblock-button-busy =
+    .label = Ad blocker
+    .tooltiptext = Turning on the ad blocker…
+adblock-button-error =
+    .label = Ad blocker
+    .tooltiptext = The ad blocker could not be installed. Check your connection and click to try again.

@@ -3870,6 +3870,16 @@ pref("browser.freevpn.custom.password", "");
 pref("browser.freevpn.checkUrl", "https://check.torproject.org/api/ip");
 pref("browser.freevpn.loglevel", "Warn");
 
+// Built-in ad blocking (uBlock Origin) with a one-click toolbar toggle. Also
+// turns off Firefox's sponsored tiles and suggestions while on.
+#if defined(XP_LINUX) || defined(XP_WIN)
+pref("browser.adblock.feature.enabled", true);
+#else
+pref("browser.adblock.feature.enabled", false);
+#endif
+pref("browser.adblock.enabled", true);
+pref("browser.adblock.widgetAdded", false);
+
 // Pref to enable aboug:glean redesign.
 pref("about.glean.redesign.enabled", false);
 
