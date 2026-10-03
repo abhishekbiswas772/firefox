@@ -128,6 +128,11 @@ add_task(async function test_install() {
     AddonManager.addInstallListener(listener);
   });
 
+  const installedNotification = BrowserTestUtils.waitForEvent(
+    PanelUI.notificationPanel,
+    "popupshown"
+  );
+
   try {
     const prompt = promisePermissionPrompt();
     const result = ChromeWebStore.install(gBrowser.selectedBrowser, CRX_ID);
@@ -140,6 +145,18 @@ add_task(async function test_install() {
     is(addon.id, `${CRX_ID}@chromewebstore`, "Installed with a Firefox id");
     await TestUtils.waitForCondition(() => addon.isActive, "Add-on running");
     ok(download.calledOnceWith(CRX_ID), "Downloaded from the store once");
+
+    await installedNotification;
+    const doorhanger = document.getElementById(
+      "appMenu-addon-installed-notification"
+    );
+    ok(BrowserTestUtils.isVisible(doorhanger), "Install is confirmed");
+    const hidden = BrowserTestUtils.waitForEvent(
+      PanelUI.notificationPanel,
+      "popuphidden"
+    );
+    doorhanger.button.click();
+    await hidden;
 
     await closePopupNotifications();
     await addon.uninstall();
