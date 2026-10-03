@@ -63,7 +63,7 @@ jobs:
       - name: xpcshell tests
         run: |
           mkdir -p test-logs
-          ./mach xpcshell-test browser/components/freevpn/tests/xpcshell 2>&1 | tee test-logs/xpcshell.log
+          xvfb-run -a ./mach xpcshell-test browser/components/freevpn/tests/xpcshell 2>&1 | tee test-logs/xpcshell.log
 
       - name: Browser tests
         run: |

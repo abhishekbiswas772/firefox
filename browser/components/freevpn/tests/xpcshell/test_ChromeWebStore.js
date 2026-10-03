@@ -17,6 +17,9 @@ const {
 const { AddonTestUtils } = ChromeUtils.importESModule(
   "resource://testing-common/AddonTestUtils.sys.mjs"
 );
+const { AddonManager } = ChromeUtils.importESModule(
+  "resource://gre/modules/AddonManager.sys.mjs"
+);
 const { FileUtils } = ChromeUtils.importESModule(
   "resource://gre/modules/FileUtils.sys.mjs"
 );
@@ -286,16 +289,20 @@ add_task(async function test_convert_and_install() {
     reader.close();
   }
 
-  const { addon } = await AddonTestUtils.promiseInstallFile(
+  // Running the extension needs a full browser; browser_chrome_web_store.js
+  // covers that. Loading the install validates the manifest against
+  // Firefox's WebExtension schemas.
+  const install = await AddonManager.getInstallForFile(
     new FileUtils.File(xpiPath)
   );
-  Assert.ok(addon, "Firefox accepts the converted extension");
-  Assert.equal(addon.id, `${CRX_ID}@chromewebstore`);
-  Assert.ok(addon.isActive, "The extension is running");
+  Assert.equal(install.error, 0, "Firefox accepts the converted extension");
+  Assert.equal(install.state, AddonManager.STATE_DOWNLOADED);
+  Assert.equal(install.addon.id, `${CRX_ID}@chromewebstore`);
+  Assert.equal(install.addon.type, "extension");
   Assert.ok(
-    WebExtensionPolicy.getByID(addon.id),
-    "The extension has a live policy"
+    !install.addon.appDisabled,
+    "The extension is compatible and allowed unsigned"
   );
-  await addon.uninstall();
+  install.cancel();
   await IOUtils.remove(xpiPath);
 });
