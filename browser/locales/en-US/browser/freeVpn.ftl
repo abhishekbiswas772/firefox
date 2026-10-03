@@ -158,3 +158,16 @@ claude-button =
 claude-button-open =
     .label = Claude
     .tooltiptext = Close Claude
+
+## Installing extensions from the Chrome Web Store. "Chrome Web Store" and
+## "Chrome" are product names and are not translated.
+
+cws-notification = This Chrome extension can be added to { -brand-short-name }.
+cws-add-button =
+    .label = Add to { -brand-short-name }
+    .accesskey = A
+# Variables:
+#   $detail (String) - Technical reason, in English.
+cws-error = The extension could not be added: { $detail }
+cws-unsigned-title = Allow extensions not checked by { -vendor-short-name }?
+cws-unsigned-message = Chrome Web Store extensions are not reviewed or signed by { -vendor-short-name }. To add them, { -brand-short-name } will allow extensions that are not signed by { -vendor-short-name }. Only add extensions you trust.

@@ -3887,6 +3887,15 @@ pref("browser.claude.button.enabled", true);
 pref("browser.claude.button.enabled", false);
 #endif
 
+// Offer to install extensions from the Chrome Web Store (converted from CRX).
+// They are not signed by Mozilla; the first install asks before turning off
+// xpinstall.signatures.required.
+#if defined(XP_LINUX) || defined(XP_WIN)
+pref("browser.chromeWebStore.enabled", true);
+#else
+pref("browser.chromeWebStore.enabled", false);
+#endif
+
 // Pref to enable aboug:glean redesign.
 pref("about.glean.redesign.enabled", false);
 

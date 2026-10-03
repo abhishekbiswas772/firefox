@@ -11,6 +11,7 @@ JAR_MANIFESTS += ["jar.mn"]
 
 MOZ_SRC_FILES += [
     "AdBlocker.sys.mjs",
+    "ChromeWebStore.sys.mjs",
     "ClaudeButton.sys.mjs",
     "FreeVPN.sys.mjs",
     "FreeVPNChannelFilter.sys.mjs",

@@ -6,6 +6,8 @@ run-if = [
   "os == 'win'",
 ]
 
+["test_ChromeWebStore.js"]
+
 ["test_FreeVPNChannelFilter.js"]
 
 ["test_FreeVPNTorLauncher.js"]

@@ -7,6 +7,8 @@ support-files = ["check_ip.json"]
 
 ["browser_adblock_toggle.js"]
 
+["browser_chrome_web_store.js"]
+
 ["browser_claude_button.js"]
 
 ["browser_freevpn_toggle.js"]
