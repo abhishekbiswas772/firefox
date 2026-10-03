@@ -56,6 +56,7 @@
 }
 
 .freevpn-settings,
+#freevpn-wireguard:not([hidden]),
 #freevpn-custom:not([hidden]) {
   display: flex;
   flex-direction: column;

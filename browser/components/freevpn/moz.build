@@ -17,6 +17,7 @@ MOZ_SRC_FILES += [
     "FreeVPNChannelFilter.sys.mjs",
     "FreeVPNTorLauncher.sys.mjs",
     "FreeVPNWidget.sys.mjs",
+    "FreeVPNWireGuard.sys.mjs",
 ]
 
 BROWSER_CHROME_MANIFESTS += ["tests/browser/browser.toml"]

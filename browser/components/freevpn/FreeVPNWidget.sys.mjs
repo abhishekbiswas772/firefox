@@ -11,6 +11,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   FreeVPN: "moz-src:///browser/components/freevpn/FreeVPN.sys.mjs",
   FreeVPNProviders: "moz-src:///browser/components/freevpn/FreeVPN.sys.mjs",
   FreeVPNStates: "moz-src:///browser/components/freevpn/FreeVPN.sys.mjs",
+  FreeVPNWireGuard:
+    "moz-src:///browser/components/freevpn/FreeVPNWireGuard.sys.mjs",
 });
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
@@ -179,6 +181,7 @@ class FreeVPNPanel {
       [
         [lazy.FreeVPNProviders.TOR, "freevpn-provider-tor"],
         [lazy.FreeVPNProviders.TOR_SYSTEM, "freevpn-provider-tor-system"],
+        [lazy.FreeVPNProviders.WIREGUARD, "freevpn-provider-wireguard"],
         [lazy.FreeVPNProviders.CUSTOM, "freevpn-provider-custom"],
       ].map(([value, id]) => ({ value, l10n: { id } })),
       "provider",
@@ -209,6 +212,32 @@ class FreeVPNPanel {
       })),
       "tor.bridgeType",
       settings
+    );
+
+    const wireguard = this.#el("div", { id: "wireguard" }, settings);
+    this.#el("p", { id: "wireguard-status" }, wireguard);
+    const wgActions = this.#el("div", { class: "freevpn-actions" }, wireguard);
+    this.#el(
+      "moz-button",
+      { id: "wireguard-import", l10n: { id: "freevpn-wireguard-import" } },
+      wgActions
+    ).addEventListener("click", () => this.#importWireGuard());
+    this.#el(
+      "moz-button",
+      {
+        id: "wireguard-remove",
+        type: "ghost",
+        l10n: { id: "freevpn-wireguard-remove" },
+      },
+      wgActions
+    ).addEventListener("click", async () => {
+      await lazy.FreeVPNWireGuard.removeConfig();
+      this.update();
+    });
+    this.#el(
+      "moz-message-bar",
+      { id: "wireguard-error", type: "error", hidden: true },
+      wireguard
     );
 
     const custom = this.#el("div", { id: "custom" }, settings);
@@ -334,6 +363,14 @@ class FreeVPNPanel {
     this.#setIfIdle("bridges", getString("tor.bridgeType", "auto"));
 
     this.#get("custom").hidden = providerId != FreeVPNProviders.CUSTOM;
+    this.#get("wireguard").hidden = providerId != FreeVPNProviders.WIREGUARD;
+    const endpoint = getString("wireguard.endpoint", "");
+    l10n.setAttributes(
+      this.#get("wireguard-status"),
+      endpoint ? "freevpn-wireguard-loaded" : "freevpn-wireguard-none",
+      { endpoint }
+    );
+    this.#get("wireguard-remove").hidden = !endpoint;
     this.#setIfIdle("custom-type", getString("custom.type", "socks"));
     this.#setIfIdle("custom-host", getString("custom.host", ""));
     this.#setIfIdle(
@@ -348,6 +385,39 @@ class FreeVPNPanel {
         fallback
       );
     }
+  }
+
+  async #importWireGuard() {
+    const win = this.doc.defaultView;
+    const error = this.#get("wireguard-error");
+    error.hidden = true;
+    const fp = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
+    const [title] = await this.doc.l10n.formatValues([
+      "freevpn-wireguard-picker-title",
+    ]);
+    fp.init(win.browsingContext, title, Ci.nsIFilePicker.modeOpen);
+    fp.appendFilter("WireGuard", "*.conf");
+    fp.appendFilters(Ci.nsIFilePicker.filterAll);
+    const result = await new Promise(resolve => fp.open(resolve));
+    if (result != Ci.nsIFilePicker.returnOK || !fp.file) {
+      return;
+    }
+    try {
+      const text = await IOUtils.readUTF8(fp.file.path, {
+        maxBytes: 64 * 1024,
+      });
+      await lazy.FreeVPNWireGuard.importConfig(text);
+      Services.prefs.setStringPref(
+        PREF_BRANCH + "provider",
+        lazy.FreeVPNProviders.WIREGUARD
+      );
+    } catch (e) {
+      this.doc.l10n.setAttributes(error, "freevpn-wireguard-import-error", {
+        detail: e.detail || e.message,
+      });
+      error.hidden = false;
+    }
+    this.update();
   }
 
   #updateDetail(state, providerId) {

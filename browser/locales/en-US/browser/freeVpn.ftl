@@ -48,6 +48,7 @@ freevpn-detail-error-blocked = Browsing is blocked so your real address is not e
 freevpn-detail-off-tor = Uses the free, open source Tor network. No account needed.
 freevpn-detail-off-tor-system = Uses the Tor service already running on this computer.
 freevpn-detail-off-custom = Uses the proxy server you set up below.
+freevpn-detail-off-wireguard = Uses your WireGuard server (Proton VPN, Cloudflare WARP or your own).
 
 ## Error messages. Variables:
 ##   $detail (String) - Technical details from Tor or the network, in English.
@@ -62,6 +63,16 @@ freevpn-error-proxy-unreachable =
     .message = Could not reach the proxy server. Check that it is running. ({ $detail })
 freevpn-error-bridges-unavailable =
     .message = No built-in “{ $detail }” bridges are available. Install the Tor Expert Bundle or choose another bridge type.
+freevpn-error-wireguard-not-configured =
+    .message = Import a WireGuard configuration file first.
+freevpn-error-wireguard-not-found =
+    .message = The WireGuard helper (wireproxy) was not found. Install wireproxy or set browser.freevpn.wireguard.binaryPath.
+freevpn-error-wireguard-invalid =
+    .message = The WireGuard file is not valid: { $detail }
+freevpn-error-wireguard-timeout =
+    .message = The WireGuard helper did not start in time. { $detail }
+freevpn-error-wireguard-exited =
+    .message = The WireGuard helper stopped: { $detail }
 freevpn-error-custom-not-configured =
     .message = Enter the host and port of your proxy server.
 freevpn-error-unknown =
@@ -87,8 +98,24 @@ freevpn-provider-tor =
     .label = Tor network (built in)
 freevpn-provider-tor-system =
     .label = Tor already running on this computer
+freevpn-provider-wireguard =
+    .label = WireGuard server (fast)
 freevpn-provider-custom =
     .label = Custom proxy server
+
+freevpn-wireguard-none = No WireGuard file imported. Download one from Proton VPN, create one for Cloudflare WARP with wgcf, or use your own server’s.
+# Variables:
+#   $endpoint (String) - The server address, e.g. "203.0.113.5:51820".
+freevpn-wireguard-loaded = Using server { $endpoint }
+freevpn-wireguard-import =
+    .label = Import WireGuard file…
+freevpn-wireguard-remove =
+    .label = Remove
+freevpn-wireguard-picker-title = Choose a WireGuard configuration file
+# Variables:
+#   $detail (String) - Technical reason, in English.
+freevpn-wireguard-import-error =
+    .message = Could not import the file: { $detail }
 
 freevpn-location =
     .label = Location

@@ -16,6 +16,7 @@ done, waiting on you), **Not possible** (cannot be done as asked; see note).
 | Linux x86_64 build + `.tar.xz` package | Done | CI build and `mach package` |
 | Windows x86_64 build + `.zip` and installer `.exe` | Done | CI build and `mach package` |
 | Tor bundled in the packages (`freevpn-tor/`), SHA-256 checked against Tor's published list | Done | CI bundling step |
+| wireproxy bundled (`freevpn-wireguard/`), SHA-256 checked against GitHub's digest | Done | CI bundling step |
 | uBlock Origin bundled (`distribution/extensions/`), id and Mozilla signature files checked | Done | CI bundling step; Firefox verifies the signature on install |
 | Mozilla-branded release builds | Not possible | Builds are artifact builds: front-end built from this branch, C++/Rust from Mozilla's Nightly for the same revision. A full source build does not fit free CI runners. |
 | Public GitHub Release with download links | Needs decision | Blocked by tool permissions; needs your go-ahead. Builds are downloadable as workflow artifacts. |
@@ -42,7 +43,10 @@ done, waiting on you), **Not possible** (cannot be done as asked; see note).
 | DNS and prefetch leak protection while connected | Done | `browser_freevpn_toggle.js` (WebRTC pref), channel filter tests |
 | Custom proxy / existing Tor providers | Done | `browser_freevpn_toggle.js` uses the custom provider |
 | Connection through the real Tor network | Partly verified | Not testable in CI (no outside network in tests); use a release build to check |
-| "Very fast" | Not possible | Tor is slower than a paid VPN. No free, unlimited, multi-country service is as fast; see README. |
+| WireGuard provider (Proton VPN Free, Cloudflare WARP, own server) via wireproxy | Done | `test_FreeVPNWireGuard.js`, `test_FreeVPNWireGuardProcess.js` (Linux), `browser_freevpn_toggle.js` |
+| WireGuard file import drops shell hooks, file readable only by the user | Done | `test_FreeVPNWireGuard.js`, `test_FreeVPNWireGuardProcess.js` |
+| Connection through a real WireGuard server | Partly verified | Needs your own config file; not testable in CI |
+| "Very fast" | Partly verified | Fast with the WireGuard provider (Proton Free or WARP); those are free tiers of paid services. Tor stays free with no account but is slower. See README. |
 
 ## Ad blocker
 
@@ -69,12 +73,15 @@ done, waiting on you), **Not possible** (cannot be done as asked; see note).
 | Item | Status | How it is checked |
 | --- | --- | --- |
 | Chrome-style WebExtensions from addons.mozilla.org | Done | Firefox's existing support |
-| Installing directly from the Chrome Web Store | Needs decision | Needs Mozilla's add-on signature check turned off; blocked pending your decision |
+| Installing directly from the Chrome Web Store (CRX to XPI, MV3 shim) | Done | `test_ChromeWebStore.js`, `browser_chrome_web_store.js` |
+| Real store download and Chrome-only APIs | Partly verified | Downloads from Google are not testable in CI; Chrome-only APIs stay missing |
 
 ## Test suites run on every push (Linux and Windows)
 
 - Lint: ESLint, stylelint, Fluent, ruff
-- xpcshell: `test_FreeVPNChannelFilter.js`, `test_FreeVPNTorLauncher.js`,
-  `test_FreeVPNTorProcess.js` (Linux)
+- xpcshell: `test_ChromeWebStore.js`, `test_FreeVPNChannelFilter.js`,
+  `test_FreeVPNTorLauncher.js`, `test_FreeVPNWireGuard.js`,
+  `test_FreeVPNTorProcess.js` and `test_FreeVPNWireGuardProcess.js` (Linux)
 - Browser: `browser_freevpn_toggle.js`, `browser_adblock_toggle.js`,
-  `browser_claude_button.js`, and all of `browser/components/genai/tests/browser`
+  `browser_claude_button.js`, `browser_chrome_web_store.js`, and all of
+  `browser/components/genai/tests/browser`

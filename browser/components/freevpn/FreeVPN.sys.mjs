@@ -18,6 +18,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "moz-src:///browser/components/freevpn/FreeVPNTorLauncher.sys.mjs",
   FreeVPNTorLauncher:
     "moz-src:///browser/components/freevpn/FreeVPNTorLauncher.sys.mjs",
+  FreeVPNWireGuard:
+    "moz-src:///browser/components/freevpn/FreeVPNWireGuard.sys.mjs",
   FreeVPNWidget: "moz-src:///browser/components/freevpn/FreeVPNWidget.sys.mjs",
 });
 
@@ -107,7 +109,10 @@ export const FreeVPNProviders = Object.freeze({
   TOR: "tor",
   // A Tor client already running on this computer (system service or Tor Browser).
   TOR_SYSTEM: "tor-system",
-  // Any SOCKS5 / HTTP proxy, e.g. a local Psiphon, wireproxy or self-hosted server.
+  // A WireGuard server (Proton VPN, Cloudflare WARP, your own server) through
+  // the userspace wireproxy client.
+  WIREGUARD: "wireguard",
+  // Any SOCKS5 / HTTP proxy, e.g. a local Psiphon or self-hosted server.
   CUSTOM: "custom",
 });
 
@@ -194,7 +199,10 @@ class FreeVPNService extends EventTarget {
   }
 
   get usesTor() {
-    return this.provider != FreeVPNProviders.CUSTOM;
+    return (
+      this.provider == FreeVPNProviders.TOR ||
+      this.provider == FreeVPNProviders.TOR_SYSTEM
+    );
   }
 
   /** @returns {Set<string>} Sites that skip the VPN (split tunneling). */
@@ -292,6 +300,7 @@ class FreeVPNService extends EventTarget {
       case PREF_BRANCH + "custom.host":
       case PREF_BRANCH + "custom.port":
       case PREF_BRANCH + "system.port":
+      case PREF_BRANCH + "wireguard.endpoint":
         if (
           this.#state == FreeVPNStates.ON ||
           this.#state == FreeVPNStates.CONNECTING
@@ -403,6 +412,19 @@ class FreeVPNService extends EventTarget {
    */
   async #openTunnel(isCurrent) {
     switch (this.provider) {
+      case FreeVPNProviders.WIREGUARD: {
+        // #launcher holds whichever helper process the provider runs.
+        this.#launcher = new lazy.FreeVPNWireGuard({
+          onExit: detail => {
+            if (isCurrent() && this.#state == FreeVPNStates.ON) {
+              this.#fail(new lazy.FreeVPNError("wireguard-exited", detail));
+              this.#scheduleRetry();
+            }
+          },
+        });
+        const port = await this.#launcher.start();
+        return { type: "socks", host: "127.0.0.1", port };
+      }
       case FreeVPNProviders.TOR_SYSTEM:
         return {
           type: "socks",

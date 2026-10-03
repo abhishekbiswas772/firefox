@@ -12,5 +12,10 @@ run-if = [
 
 ["test_FreeVPNTorLauncher.js"]
 
+["test_FreeVPNWireGuard.js"]
+
+["test_FreeVPNWireGuardProcess.js"]
+run-if = ["os == 'linux'"]
+
 ["test_FreeVPNTorProcess.js"]
 run-if = ["os == 'linux'"]

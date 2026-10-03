@@ -37,9 +37,9 @@ Findings:
   would need the SoftEther client and a system VPN adapter, and measured
   slower than Tor on average.
 - The way to get real speed is WireGuard through
-  [wireproxy](https://github.com/whyvl/wireproxy) (ISC licence, userspace,
+  [wireproxy](https://github.com/windtf/wireproxy) (ISC licence, userspace,
   exposes SOCKS5): it works with Proton VPN Free, Cloudflare WARP, or your own
-  free cloud server. Adding a WireGuard provider is the proposed next step.
+  free cloud server. This is the **WireGuard** provider below.
 
 Any service that already exposes a local SOCKS5 or HTTP proxy can be used now
 with the **Custom proxy** setting.
@@ -77,12 +77,32 @@ with the **Custom proxy** setting.
 | --- | --- |
 | `tor` (default) | A Tor process started by the browser. |
 | `tor-system` | A Tor already running on this computer (`browser.freevpn.system.port`, default 9050; 9150 for Tor Browser). |
+| `wireguard` | A WireGuard server through a bundled wireproxy process (no admin rights, no system VPN adapter). |
 | `custom` | Any SOCKS5 / HTTP / HTTPS proxy (`browser.freevpn.custom.*`). |
 
 Tor is looked up in this order: `browser.freevpn.tor.binaryPath`, the copy
 bundled with the browser (`freevpn-tor/tor/tor[.exe]`), common install
 locations (`/usr/bin/tor`; `%ProgramFiles%\Tor`, Tor Browser on the Desktop),
 then `PATH`.
+
+### WireGuard (fast)
+
+Choose **WireGuard** in the panel and import a `.conf` file:
+
+- **Proton VPN Free**: account.protonvpn.com, Downloads, WireGuard
+  configuration, pick a free server.
+- **Cloudflare WARP**: run [wgcf](https://github.com/ViRb3/wgcf)
+  (`wgcf register && wgcf generate`) and import `wgcf-profile.conf`.
+- **Your own server**: any WireGuard client config (for example from an
+  Oracle Cloud Always Free VM running `wg-quick`).
+
+The file is validated and only the keys wireproxy uses are kept, so
+`PostUp`/`PreUp` shell commands in a downloaded file are never run. It is
+stored as `<profile>/freevpn/wireguard.conf`, readable only by you. wireproxy
+is looked up in `browser.freevpn.wireguard.binaryPath`, the bundled
+`freevpn-wireguard/wireproxy[.exe]`, `/usr/bin`, `/usr/local/bin`, then
+`PATH`. Split tunneling, the kill switch and WebRTC handling work the same as
+with Tor; exit country and bridges do not apply (the server decides).
 
 ## Ad blocker
 
@@ -120,6 +140,17 @@ shortcut). This build makes it one click away:
   list by default, because Claude rejects or challenges many Tor exits and
   login would otherwise fail while the VPN is on.
 
+## Chrome Web Store
+
+On a `chromewebstore.google.com` extension page, a bar offers to add the
+extension. It downloads the CRX, converts it to a Firefox add-on (Manifest V3
+`service_worker` becomes a background script with a small compatibility
+shim; Chrome-only permissions Firefox lacks are dropped) and installs it with
+the normal permission prompt. The first time, it asks to allow extensions not
+signed by Mozilla (`xpinstall.signatures.required`), which Nightly-based builds
+like these honour. Turn it off with `browser.chromeWebStore.enabled`.
+Extensions that depend on Chrome-only APIs will be limited.
+
 ## Building (Linux and Windows only)
 
 The features are compiled in only when `OS_ARCH` is `Linux` or `WINNT`.
@@ -130,6 +161,8 @@ The features are compiled in only when `OS_ARCH` is `Linux` or `WINNT`.
 export MOZCONFIG=$PWD/browser/components/freevpn/build/mozconfig.linux64
 ./mach build
 python3 browser/components/freevpn/tools/fetch_tor.py \
+    --platform linux-x86_64 --dest obj-freevpn-linux64/dist/bin
+python3 browser/components/freevpn/tools/fetch_wireproxy.py \
     --platform linux-x86_64 --dest obj-freevpn-linux64/dist/bin
 python3 browser/components/freevpn/tools/fetch_ublock.py \
     --dest obj-freevpn-linux64/dist/bin
@@ -157,5 +190,8 @@ workflow artifacts.
 
 - Only browser traffic is tunneled.
 - Tor is slower than a paid VPN; some sites block or challenge Tor exits.
+  Use the WireGuard provider for speed.
+- WireGuard has one exit per configuration file; import another file to change
+  country.
 - The custom proxy password is stored as a plain pref.
 - Builds are Nightly-based artifact builds, not Mozilla-branded release builds.

@@ -8,4 +8,5 @@
 FINAL_TARGET = "dist/bin"
 
 FINAL_TARGET_FILES["freevpn-tor"] += ["README.txt"]
+FINAL_TARGET_FILES["freevpn-wireguard"] += ["README.txt"]
 FINAL_TARGET_FILES.distribution.extensions += ["README.txt"]

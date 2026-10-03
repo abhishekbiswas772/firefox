@@ -70,11 +70,12 @@ jobs:
           mkdir -p test-logs
           xvfb-run -a ./mach mochitest browser/components/freevpn/tests/browser browser/components/genai/tests/browser 2>&1 | tee test-logs/mochitest.log
 
-      - name: Bundle Tor and uBlock Origin
+      - name: Bundle Tor, wireproxy and uBlock Origin
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           python3 browser/components/freevpn/tools/fetch_tor.py --platform linux-x86_64 --dest "$OBJDIR/dist/bin"
+          python3 browser/components/freevpn/tools/fetch_wireproxy.py --platform linux-x86_64 --dest "$OBJDIR/dist/bin"
           python3 browser/components/freevpn/tools/fetch_ublock.py --dest "$OBJDIR/dist/bin"
 
       - name: Package
@@ -153,12 +154,13 @@ jobs:
           mkdir -p test-logs
           ./mach mochitest browser/components/freevpn/tests/browser browser/components/genai/tests/browser 2>&1 | tee test-logs/mochitest.log
 
-      - name: Bundle Tor and uBlock Origin
+      - name: Bundle Tor, wireproxy and uBlock Origin
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           export PATH="/c/mozilla-build/python3:/c/mozilla-build/bin:$PATH"
           python3 browser/components/freevpn/tools/fetch_tor.py --platform windows-x86_64 --dest "$OBJDIR/dist/bin"
+          python3 browser/components/freevpn/tools/fetch_wireproxy.py --platform windows-x86_64 --dest "$OBJDIR/dist/bin"
           python3 browser/components/freevpn/tools/fetch_ublock.py --dest "$OBJDIR/dist/bin"
 
       - name: Package

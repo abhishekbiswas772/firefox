@@ -3836,7 +3836,8 @@ pref("browser.freevpn.enabled", true);
 #else
 pref("browser.freevpn.enabled", false);
 #endif
-// "tor" (managed Tor), "tor-system" (Tor already running) or "custom".
+// "tor" (managed Tor), "tor-system" (Tor already running), "wireguard"
+// (WireGuard via wireproxy) or "custom".
 pref("browser.freevpn.provider", "tor");
 // "all" tunnels every window, "private" only private windows.
 pref("browser.freevpn.mode", "all");
@@ -3863,6 +3864,10 @@ pref("browser.freevpn.batterySaver", true);
 // Video and audio calls need UDP, which cannot go through Tor.
 pref("browser.freevpn.bypassDomains", "meet.google.com,zoom.us,zoom.com,teams.microsoft.com,teams.live.com,teams.cloud.microsoft,whereby.com,meet.jit.si,8x8.vc,discord.com,web.whatsapp.com,web.telegram.org,app.slack.com,webex.com,messenger.com,claude.ai,claude.com,anthropic.com");
 pref("browser.freevpn.system.port", 9050);
+// WireGuard provider: path to wireproxy (empty to use the bundled copy or
+// PATH) and the endpoint of the imported configuration (set on import).
+pref("browser.freevpn.wireguard.binaryPath", "");
+pref("browser.freevpn.wireguard.endpoint", "");
 pref("browser.freevpn.custom.type", "socks");
 pref("browser.freevpn.custom.host", "");
 pref("browser.freevpn.custom.port", 1080);

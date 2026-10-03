@@ -471,5 +471,6 @@ bin/libfreebl_64int_3.so
 ; Free VPN's Tor and the built-in ad blocker (browser/components/freevpn).
 #if defined(XP_LINUX) || defined(XP_WIN)
 @BINPATH@/freevpn-tor
+@BINPATH@/freevpn-wireguard
 @BINPATH@/distribution/extensions
 #endif

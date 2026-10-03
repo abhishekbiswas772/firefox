@@ -192,3 +192,72 @@ add_task(async function test_private_only_mode() {
   await waitForState(FreeVPNStates.OFF);
   await SpecialPowers.popPrefEnv();
 });
+
+add_task(async function test_wireguard_provider() {
+  const { FreeVPNWireGuard } = ChromeUtils.importESModule(
+    "moz-src:///browser/components/freevpn/FreeVPNWireGuard.sys.mjs"
+  );
+  await FreeVPNWireGuard.removeConfig();
+  await SpecialPowers.pushPrefEnv({
+    set: [["browser.freevpn.provider", "wireguard"]],
+  });
+
+  FreeVPN.connect();
+  await waitForState(FreeVPNStates.ERROR);
+  is(
+    FreeVPN.error?.code,
+    "wireguard-not-configured",
+    "Asks for a WireGuard file first"
+  );
+  ok(!(await canFetch(CHECK_URL)), "Kill switch blocks without a tunnel");
+
+  await FreeVPNWireGuard.importConfig(`[Interface]
+PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+Address = 10.2.0.2/32
+[Peer]
+PublicKey = xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
+AllowedIPs = 0.0.0.0/0
+Endpoint = 203.0.113.5:51820
+`);
+
+  const panelShown = BrowserTestUtils.waitForEvent(
+    document,
+    "ViewShown",
+    false,
+    e => e.target.id == "PanelUI-freevpn"
+  );
+  document.getElementById("freevpn-button-dropmarker").click();
+  await panelShown;
+
+  ok(
+    BrowserTestUtils.isVisible(document.getElementById("freevpn-wireguard")),
+    "WireGuard section is shown"
+  );
+  ok(
+    BrowserTestUtils.isHidden(document.getElementById("freevpn-custom")),
+    "Custom proxy fields are hidden"
+  );
+  const status = document.getElementById("freevpn-wireguard-status");
+  is(status.getAttribute("data-l10n-id"), "freevpn-wireguard-loaded");
+  is(
+    JSON.parse(status.getAttribute("data-l10n-args")).endpoint,
+    "203.0.113.5:51820",
+    "Shows the imported server"
+  );
+  ok(
+    BrowserTestUtils.isVisible(
+      document.getElementById("freevpn-wireguard-remove")
+    ),
+    "Remove button is shown"
+  );
+
+  const panel = document.getElementById("PanelUI-freevpn").closest("panel");
+  const hidden = BrowserTestUtils.waitForEvent(panel, "popuphidden");
+  panel.hidePopup();
+  await hidden;
+
+  FreeVPN.disconnect();
+  await waitForState(FreeVPNStates.OFF);
+  await FreeVPNWireGuard.removeConfig();
+  await SpecialPowers.popPrefEnv();
+});
