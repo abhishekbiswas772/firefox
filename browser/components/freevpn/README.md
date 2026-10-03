@@ -14,21 +14,35 @@ Built-in privacy features for Firefox on **Linux and Windows**:
 
 ## Choosing the VPN
 
-| Option | Free, no paid tier | Open source | No account | Many countries | Works in the browser without admin rights |
-| --- | --- | --- | --- | --- | --- |
-| **Tor** | Yes | Yes (BSD) | Yes | Yes (exit country can be picked) | Yes (local SOCKS5 proxy) |
-| VPN Gate (Univ. of Tsukuba) | Yes | Client yes (SoftEther) | Yes | Yes | No: OpenVPN/L2TP/SSTP need a system VPN adapter |
-| RiseupVPN / CalyxVPN | Yes (donations) | Yes (GPL) | Yes | Few | No: OpenVPN needs a system VPN adapter |
-| Psiphon | Yes | Yes (GPL) | Yes | Yes | Needs network config values issued by Psiphon |
-| Lantern, Proton VPN free, Cloudflare WARP | Free tier of a paid product | Partly | Varies | Limited | Varies |
+Requirements: free with no paid tier, many countries, fast, browser-only, and
+no admin rights (so it must run as a local SOCKS/HTTP proxy, not a system VPN
+adapter).
 
-Tor is the only option that is fully free with no paid tier, fully open source,
-needs no account, offers many countries, and runs as an unprivileged local
-proxy on both Linux and Windows. Its trade-off is speed: Tor is slower than a
-commercial VPN and some sites block or challenge Tor exits. Nothing that is
-free, unlimited and multi-country is also as fast as a paid VPN, because
-someone has to pay for the bandwidth. Any other service that exposes a local
-SOCKS5 or HTTP proxy can be used with the **Custom proxy** setting.
+| Option | Cost model | Speed (typical) | Countries | Logs / who can see traffic | Browser-only without admin |
+| --- | --- | --- | --- | --- | --- |
+| **Tor** (built in) | Free, volunteer-run | ~5-20 Mbps; Conflux helps | Many, selectable | No single party sees both you and the site | Yes |
+| VPN Gate (SoftEther, Univ. of Tsukuba) | Free, volunteer-run | Reviews measured ~1-2 Mbps average; some servers much faster | Many | Connection logs kept 3+ months; volunteer operators can see unencrypted traffic | No: SoftEther protocol and its OpenVPN mode (CBC ciphers only) have no userspace client |
+| RiseupVPN / CalyxVPN | Free, donation-funded | Reported 40-120 Mbps | ~5 locations | No logs | Not yet: OpenVPN; the only userspace OpenVPN-to-SOCKS client found is brand new |
+| Psiphon | Free tier of a paid app | Capped at ~2 Mbps | Many | Psiphon sees traffic metadata | Yes (local SOCKS), but needs Psiphon-issued config |
+| Proton VPN Free | Free tier of a paid product, account needed | Good | 10 countries, picked automatically | No-logs policy | Yes via WireGuard config + wireproxy |
+| Cloudflare WARP | Free tier of WARP+ | Fastest | Exits near you only | Cloudflare sees metadata | Yes via WireGuard + wireproxy; free registration uses an unofficial client |
+| Own WireGuard server on Oracle Cloud Always Free | Free cloud tier (10 TB/month egress) | Fast (your own VM) | One region per account | Only you | Yes via WireGuard + wireproxy; sign-up is often hard |
+
+Findings:
+
+- No option is free with no paid tier, many countries, and as fast as a paid
+  VPN at the same time; someone has to pay for the bandwidth.
+- Among the options with no strings at all (no account, no paid tier), Tor is
+  the only one that works inside the browser without admin rights. VPN Gate
+  would need the SoftEther client and a system VPN adapter, and measured
+  slower than Tor on average.
+- The way to get real speed is WireGuard through
+  [wireproxy](https://github.com/whyvl/wireproxy) (ISC licence, userspace,
+  exposes SOCKS5): it works with Proton VPN Free, Cloudflare WARP, or your own
+  free cloud server. Adding a WireGuard provider is the proposed next step.
+
+Any service that already exposes a local SOCKS5 or HTTP proxy can be used now
+with the **Custom proxy** setting.
 
 ## VPN features
 
